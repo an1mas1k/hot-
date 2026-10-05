@@ -1,0 +1,174 @@
+[
+  {
+    "id": "muv599bbb3bg15",
+    "username": "hot_news",
+    "name": "HOT news",
+    "description": "@Оффициальный канал",
+    "avatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+    "owner": "Dev",
+    "members": [
+      "Dev",
+      "An1mas1k"
+    ],
+    "messages": [
+      {
+        "id": "muv59p956awrxd",
+        "from": "HOT news",
+        "channelUsername": "hot_news",
+        "channelAvatar": "",
+        "text": "Всем привет. Тут будет информация он новый обновлениях.",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T11:06:22.361Z",
+        "pinned": true
+      },
+      {
+        "id": "muv5abm01q14cx",
+        "from": "Dev",
+        "channelUsername": "hot_news",
+        "channelAvatar": "",
+        "text": "проверка",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T11:06:51.336Z",
+        "pinned": false
+      },
+      {
+        "id": "muvaudlw6ejhb2",
+        "from": "An1mas1k",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "Привет",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T13:42:25.124Z",
+        "pinned": false
+      },
+      {
+        "id": "muvauh2uli2djf",
+        "from": "★ Основатель | Dev",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "выф",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T13:42:29.622Z",
+        "pinned": false
+      },
+      {
+        "id": "muvauu37xz7vo1",
+        "from": "★ Основатель | Dev",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "фыв",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T13:42:46.483Z",
+        "pinned": false
+      },
+      {
+        "id": "muvb7xdvu6ha7d",
+        "from": "An1mas1k",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "sadasd",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T13:52:57.283Z",
+        "pinned": false
+      },
+      {
+        "id": "muvb857wm3puvw",
+        "from": "An1mas1k",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "asdsa",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T13:53:07.436Z",
+        "pinned": false
+      },
+      {
+        "id": "muvdmaq15fycb4",
+        "from": "HOT news",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "",
+        "file": {
+          "name": "Безымянный.png",
+          "size": 30674,
+          "url": "/uploads/c35e4702b161aef1a8ff12d9cb4530a5.png"
+        },
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T15:00:06.985Z",
+        "pinned": false
+      },
+      {
+        "id": "muvdsdbr8gscpb",
+        "from": "HOT news",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "https:\\\\asdasd",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T15:04:50.295Z",
+        "pinned": false
+      },
+      {
+        "id": "muvdsp8e37jpib",
+        "from": "HOT news",
+        "channelUsername": "hot_news",
+        "channelAvatar": "/uploads/cd4128cde7e50da1f9dd8dd38669f8a9.png",
+        "text": "https://рыф",
+        "file": null,
+        "reactions": {
+          "like": [],
+          "fire": [],
+          "demon": []
+        },
+        "createdAt": "2026-10-05T15:05:05.726Z",
+        "pinned": false
+      }
+    ],
+    "pinnedMessageId": "muv59p956awrxd",
+    "createdAt": "2026-10-05T11:06:01.703Z",
+    "allowInvites": true,
+    "writeMode": "owner"
+  }
+]

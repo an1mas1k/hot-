@@ -1,0 +1,149 @@
+[
+  {
+    "username": "HOT",
+    "email": "dsaasddsaasd@gmail.com",
+    "salt": "b5259b8ea3ac74f874b887d334abea27",
+    "passwordHash": "3ec81d081b4243723d6731ccc902de1eea770fdb2e8a249c76dd3a3ddbe8e22e985a440ae08f1f94c2a889e586f82c10fcea68ce5131af7e1b256cf786a386b0",
+    "avatar": "",
+    "handle": "",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-04T09:22:52.447Z",
+    "privacyVersion": "2026-10-03",
+    "createdAt": "2026-10-04T09:22:52.447Z",
+    "lastSeen": "2026-10-04T09:38:42.522Z",
+    "system": true
+  },
+  {
+    "username": "Dev",
+    "email": "dsajdhas@gmail.com",
+    "salt": "6358767fc19d7578886b437eb13c9743",
+    "passwordHash": "b38fe091b62f4d81d501caca24655013c77f72d5b7bfdf98222966059310478b2e8a5f4ff4df36d4fb7d8607dcf44b76a15831bbdc3e3b4029bdda6a69610f2b",
+    "avatar": "/uploads/f57a94d407805e68f19122165d0cfaef.jpg",
+    "handle": "Dev",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [
+      "Dev_owner",
+      "Gggg"
+    ],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-04T16:59:44.448Z",
+    "privacyVersion": "2026-10-03",
+    "createdAt": "2026-10-04T16:59:44.448Z",
+    "lastSeen": "2026-10-05T17:19:57.427Z",
+    "adminRole": "founder",
+    "lastIP": "127.0.0.1",
+    "devices": [
+      "Windows|127.0.0.1"
+    ]
+  },
+  {
+    "username": "An1mas1k",
+    "email": "1231321@gmail.com",
+    "salt": "fa0133888343680b76ea20eb984de158",
+    "passwordHash": "081d0a7b42c724e2ed29aa09ec56ee86b499d5c42bc36cebc0e3d498f9e5d31a84f95c6dcfee7a388723b0109fef74ea3436a45e4fdf097b310358e21b3b3290",
+    "avatar": "",
+    "handle": "",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-04T17:54:35.155Z",
+    "privacyVersion": "2026-10-03",
+    "createdAt": "2026-10-04T17:54:35.155Z",
+    "lastSeen": "2026-10-05T14:45:57.472Z",
+    "adminRole": "admin",
+    "muted": true,
+    "banned": false,
+    "bannedIP": false,
+    "bannedIPs": [],
+    "lastIP": "",
+    "devices": [
+      "Windows|127.0.0.1"
+    ]
+  },
+  {
+    "username": "Dev_owner",
+    "email": "123321213@gmail.com",
+    "salt": "a17003db1bb78fda63955821d079bdcb",
+    "passwordHash": "7d4ad278a3d47552c0ae826cbcee14532e432046f07923f69c8642140493194feb540b572eff2166adf6542d768392824e0e5389c87d1e4a45f2a0d2af1014de",
+    "avatar": "",
+    "handle": "",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [
+      "Dev"
+    ],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-04T17:55:47.398Z",
+    "privacyVersion": "2026-10-03",
+    "createdAt": "2026-10-04T17:55:47.398Z",
+    "lastSeen": "2026-10-05T13:41:47.034Z",
+    "adminRole": null,
+    "muted": false,
+    "banned": true,
+    "bannedIP": false,
+    "bannedIPs": [],
+    "lastIP": "127.0.0.1",
+    "devices": [
+      "Windows|127.0.0.1"
+    ]
+  },
+  {
+    "username": "assad",
+    "email": "asd@gmail.com",
+    "salt": "31020ccb204133ce9fc8748596d33b1c",
+    "passwordHash": "7075ec5c06fd70a8d19f83ab5e3cdef54cf3d5daad2748521ab9ae171a8ed071be20bd9e15a59d86a4e88d0591a27da7e6b9a415ffd877cf4b84bdcb2dd33ef1",
+    "avatar": "",
+    "handle": "",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-05T13:41:35.307Z",
+    "privacyVersion": "2026-10-04",
+    "devices": [
+      "Windows|127.0.0.1"
+    ],
+    "createdAt": "2026-10-05T13:41:35.308Z",
+    "lastSeen": "2026-10-05T13:41:35.337Z",
+    "adminRole": null
+  },
+  {
+    "username": "Gggg",
+    "email": "hzhzjz@gmail.com",
+    "salt": "ac6f6d9c47a5bfc2e1dab1e885cc3d6e",
+    "passwordHash": "4c1c41fcff1175680e175711f019aca533cd21f3eaeb06f818a0e11ed52006e8cd8eecc295dab85f8e7394cd50f2f02017cff25420652dde32cda9d4bd8034e1",
+    "avatar": "",
+    "handle": "",
+    "theme": "dark",
+    "wallpaper": "",
+    "birthday": "",
+    "friends": [
+      "Dev"
+    ],
+    "incomingRequests": [],
+    "blocked": [],
+    "privacyAcceptedAt": "2026-10-05T16:09:09.016Z",
+    "privacyVersion": "2026-10-04",
+    "devices": [
+      "Android|192.168.0.50"
+    ],
+    "createdAt": "2026-10-05T16:09:09.025Z",
+    "lastSeen": "2026-10-05T16:29:19.254Z",
+    "adminRole": null
+  }
+]
