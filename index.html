@@ -1617,6 +1617,8 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
         var API = '';
         var STORAGE_SESSION = 'hot_session';
         var STORAGE_ACCOUNTS = 'hot_accounts';
+        var STORAGE_DEVICE_ID = 'hot_account_device_id';
+        var MAX_SAVED_ACCOUNTS = 3;
         var MAX_AVATAR_SIZE = 10 * 1024 * 1024;
         var AVATAR_DIMENSION = 200;
         var MAX_POST_IMAGE_SIZE = 10 * 1024 * 1024;
@@ -1632,6 +1634,8 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
         var currentTab = 'all';
         var dmPartner = null;
         var dmPollTimer = null;
+        var favoritesPollTimer = null;
+        var favoritesLastMessageId = null;
         var dmLastMessageId = null;
         var dmBlocked = false;
         var dmBlockedByMe = false;
@@ -1649,17 +1653,33 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
         function clearSession() { currentToken = null; localStorage.removeItem(STORAGE_SESSION); }
 
         function getSavedAccounts() {
-            try { return JSON.parse(localStorage.getItem(STORAGE_ACCOUNTS) || '[]'); }
-            catch (e) { return []; }
+            try {
+                var parsed = JSON.parse(localStorage.getItem(STORAGE_ACCOUNTS) || '[]');
+                if (!Array.isArray(parsed)) return [];
+                return parsed.filter(function (x) { return x && typeof x.username === 'string' && typeof x.token === 'string'; }).slice(-MAX_SAVED_ACCOUNTS);
+            } catch (e) { return []; }
+        }
+        function getOrCreateAccountDeviceId() {
+            try {
+                var existing = localStorage.getItem(STORAGE_DEVICE_ID) || '';
+                if (/^[a-f0-9]{32}$/.test(existing)) return existing;
+                var bytes = new Uint8Array(16);
+                if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+                else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+                var id = Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+                localStorage.setItem(STORAGE_DEVICE_ID, id);
+                return id;
+            } catch (e) { return ''; }
         }
         function saveAccount(acc) {
-            if (!acc || !acc.username || !acc.token) return;
+            if (!acc || !acc.username || !acc.token) return false;
             var list = getSavedAccounts();
             var idx = list.findIndex(function (x) { return x.username.toLowerCase() === acc.username.toLowerCase(); });
             var entry = { username: acc.username, avatar: acc.avatar || '', handle: acc.handle || '', token: acc.token };
+            if (idx === -1 && list.length >= MAX_SAVED_ACCOUNTS) return false;
             if (idx === -1) list.push(entry); else list[idx] = entry;
-            if (list.length > 5) list = list.slice(-5);
-            localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(list));
+            localStorage.setItem(STORAGE_ACCOUNTS, JSON.stringify(list.slice(-MAX_SAVED_ACCOUNTS)));
+            return true;
         }
         function removeSavedAccount(username) {
             var list = getSavedAccounts().filter(function (x) { return x.username.toLowerCase() !== username.toLowerCase(); });
@@ -1816,6 +1836,7 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
             if (chatStatusInterval) { clearInterval(chatStatusInterval); chatStatusInterval = null; }
             if (dmStatusInterval) { clearInterval(dmStatusInterval); dmStatusInterval = null; }
             stopDmPolling();
+            stopFavoritesPolling();
         }
 
         function setMode(m) {
@@ -2950,13 +2971,24 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
         }
         function loadChatList() {
             chatlistBody.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);">Загрузка...</div>';
-            apiGet('/api/dm/conversations').then(function (r) {
-                var dms = r.conversations || [];
-                var all = [];
+            Promise.all([apiGet('/api/dm/conversations'), apiGet('/api/favorites')]).then(function (results) {
+                var dms = results[0].conversations || [];
+                var favoriteMessages = results[1].messages || [];
+                var lastFavorite = favoriteMessages.length ? favoriteMessages[favoriteMessages.length - 1] : null;
+                var all = [{
+                    type: 'favorites', id: '__favorites__', name: 'Избранное', avatar: '', handle: '',
+                    lastText: lastFavorite ? lastFavorite.text : 'Личные заметки и сохранённые сообщения',
+                    lastAt: lastFavorite ? lastFavorite.createdAt : '', lastFrom: lastFavorite ? lastFavorite.from : '',
+                    unread: 0, data: null
+                }];
                 dms.forEach(function (c) {
-                    all.push({ type:'dm', id:c.username, name:c.username, avatar:c.avatar, handle:c.handle, lastText:c.lastText, lastType:c.lastType, lastCallType:c.lastCallType, lastSystem: c.lastSystem, lastAt:c.lastAt, lastFrom:c.lastFrom, unread:c.unread, data:c });
+                    all.push({ type:'dm', id:c.username, name:c.username, avatar:c.avatar, handle:c.handle, lastText:c.lastText, lastType:c.lastType, lastCallType:c.lastCallType, lastSystem:c.lastSystem, lastAt:c.lastAt, lastFrom:c.lastFrom, unread:c.unread, data:c });
                 });
-                all.sort(function (a, b) { return new Date(b.lastAt || 0) - new Date(a.lastAt || 0); });
+                all.sort(function (a, b) {
+                    if (a.type === 'favorites') return -1;
+                    if (b.type === 'favorites') return 1;
+                    return new Date(b.lastAt || 0) - new Date(a.lastAt || 0);
+                });
                 renderChatList(all);
             }).catch(function(){ chatlistBody.innerHTML='<div class="chatlist-empty">Не удалось загрузить сообщения</div>'; });
         }
@@ -2968,12 +3000,13 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
             var html = '';
             items.forEach(function (c) {
                 var isUnread = c.unread > 0;
-                var isSystem = isSystemName(c.name);
+                var isFavorite = c.type === 'favorites';
+                var isSystem = !isFavorite && isSystemName(c.name);
                 var prefix = (c.lastFrom && currentUser && c.lastFrom.toLowerCase() === currentUser.username.toLowerCase()) ? 'Вы: ' : '';
-                html += '<div class="chat-item' + (isUnread ? ' unread' : '') + '" data-chat-type="' + c.type + '" data-chat-id="' + escapeHtml(c.id) + '">';
-                html += '<div class="chat-item-avatar' + (isSystem ? ' system' : '') + '">' + (isSystem ? hotIcon('shield',22) : avatarHTML(c)) + '</div>';
+                html += '<div class="chat-item' + (isUnread ? ' unread' : '') + (isFavorite ? ' favorites-chat-item' : '') + '" data-chat-type="' + c.type + '" data-chat-id="' + escapeHtml(c.id) + '">';
+                html += '<div class="chat-item-avatar' + (isSystem ? ' system' : '') + '">' + (isFavorite ? hotIcon('heart',22) : (isSystem ? hotIcon('shield',22) : avatarHTML(c))) + '</div>';
                 html += '<div class="chat-item-body">';
-                html += '<div class="chat-item-top"><div class="chat-item-name">' + escapeHtml(c.name) + (isSystem ? '<span class="system-badge">система</span>' : '') + '</div><div class="chat-item-time">' + formatTime(c.lastAt) + '</div></div>';
+                html += '<div class="chat-item-top"><div class="chat-item-name">' + escapeHtml(c.name) + (isSystem ? '<span class="system-badge">система</span>' : '') + '</div><div class="chat-item-time">' + (c.lastAt ? formatTime(c.lastAt) : '') + '</div></div>';
                 if (c.lastSystem) {
                     html += '<div class="chat-item-preview">' + hotIcon('shield',14) + ' ' + escapeHtml(c.lastText || 'Системное сообщение') + '</div>';
                 } else if (c.lastType === 'call') {
@@ -2986,18 +3019,153 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
                 html += '</div>';
             });
             chatlistBody.innerHTML = html;
+            if (document.getElementById('favorites-messages')) {
+                var favoriteRow = chatlistBody.querySelector('.chat-item[data-chat-type="favorites"]');
+                if (favoriteRow) favoriteRow.classList.add('active');
+            }
             chatlistBody.querySelectorAll('.chat-item').forEach(function (el) {
                 el.addEventListener('click', function () {
                     var type = el.getAttribute('data-chat-type');
                     var id = el.getAttribute('data-chat-id');
                     document.querySelectorAll('.chat-item').forEach(function (x) { x.classList.remove('active'); });
                     el.classList.add('active');
-                    if (type === 'dm') {
+                    if (type === 'favorites') {
+                        openFavorites();
+                    } else if (type === 'dm') {
                         var c = items.filter(function (x) { return x.id === id && x.type === 'dm'; })[0];
                         if (c) openDm(c.data);
                     }
                 });
             });
+        }
+
+        function openFavorites() {
+            clearReplyTarget();
+            clearChatElements();
+            dmPartner = null;
+            dmBlocked = false;
+            dmBlockedByMe = false;
+            favoritesLastMessageId = null;
+            currentTab = 'dm';
+            setActiveNav('nav-messages');
+            document.body.classList.add('m-chat');
+            contentEl.style.display = 'flex';
+            chatlistEl.classList.remove('hidden');
+            infoPanel.classList.remove('visible');
+            contentInner.innerHTML = '<div class="chat-body" id="favorites-messages"><div style="text-align:center;padding:20px;color:var(--text-3);">Загрузка...</div></div>';
+            var header = document.createElement('div');
+            header.className = 'chat-header favorites-header';
+            header.innerHTML = '<div class="chat-header-info"><div class="chat-header-avatar">' + hotIcon('heart',22) + '</div><div class="chat-header-meta"><div class="chat-header-name">Избранное</div><div class="chat-header-status">Личные заметки — видны только вам</div></div></div><div class="chat-header-actions"></div>';
+            contentEl.insertBefore(header, contentInner);
+            var backBtn = document.createElement('button');
+            backBtn.type = 'button'; backBtn.className = 'chat-back-btn'; backBtn.textContent = '←';
+            backBtn.addEventListener('click', function () { openMessages(); });
+            header.insertBefore(backBtn, header.firstChild);
+            renderFavoritesInput();
+            loadFavoritesMessages(true);
+            favoritesPollTimer = setInterval(function () { loadFavoritesMessages(false); }, 2500);
+        }
+
+        function renderFavoritesInput() {
+            var oldInput = contentEl.querySelector('.chat-input-area');
+            if (oldInput) oldInput.remove();
+            var inputArea = document.createElement('div');
+            inputArea.className = 'chat-input-area';
+            inputArea.innerHTML = '<div class="pending-media-preview" id="favorites-media-preview" style="display:none;"></div><div class="chat-input-row"><input type="text" class="chat-input" id="favorites-input-field" placeholder="Написать в Избранное..." maxlength="4000"><label class="chat-input-icon-btn" for="favorites-image-input" title="Прикрепить фото" style="cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg class="hot-ui-icon" width="21" height="21" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21.4 11.6l-8.9 8.9a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7l-9.5 9.5a2 2 0 0 1-2.8-2.8l8.8-8.8" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></label><input type="file" id="favorites-image-input" accept="image/*" style="display:none;"><button class="chat-send" id="favorites-send-btn" type="button" aria-label="Отправить"><svg class="hot-ui-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/></svg></button></div><div class="chat-error" id="chat-error"></div>';
+            contentEl.appendChild(inputArea);
+            var input = document.getElementById('favorites-input-field');
+            var sendBtn = document.getElementById('favorites-send-btn');
+            var imageInput = document.getElementById('favorites-image-input');
+            var pendingPhoto = null;
+            imageInput.addEventListener('change', function () {
+                var file = imageInput.files && imageInput.files[0];
+                if (!file) return;
+                if ((file.type || '').indexOf('image/') !== 0) { showChatError('Выбери файл изображения'); imageInput.value = ''; return; }
+                if (file.size > 5 * 1024 * 1024) { showChatError('Фото должно быть не больше 5 МБ'); imageInput.value = ''; return; }
+                pendingPhoto = file;
+                showPendingMediaPreview('favorites-media-preview', file, function () { pendingPhoto = null; imageInput.value = ''; showPendingMediaPreview('favorites-media-preview', null); });
+            });
+            function sendFavorite() {
+                var text = (input.value || '').trim();
+                if (!text && !pendingPhoto) return;
+                if (sendTooFast()) return;
+                sendBtn.disabled = true;
+                var photo = pendingPhoto;
+                var payload = { text: text };
+                var ready = photo ? readFileAsDataUrl(photo).then(function (data) { payload.image = data; }) : Promise.resolve();
+                ready.then(function () { return apiPost('/api/favorites', payload); }).then(function () {
+                    input.value = '';
+                    pendingPhoto = null;
+                    imageInput.value = '';
+                    showPendingMediaPreview('favorites-media-preview', null);
+                    loadFavoritesMessages(true);
+                    loadChatList();
+                    input.focus();
+                }).catch(function (e) {
+                    showChatError((e && e.message) || 'Не удалось сохранить сообщение');
+                }).then(function () { sendBtn.disabled = false; });
+            }
+            sendBtn.addEventListener('click', sendFavorite);
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendFavorite(); }
+            });
+        }
+
+        function loadFavoritesMessages(forceScroll) {
+            var body = document.getElementById('favorites-messages');
+            if (!body) return;
+            apiGet('/api/favorites').then(function (data) {
+                if (document.getElementById('favorites-messages') !== body) return;
+                var messages = data.messages || [];
+                var newLastId = messages.length ? messages[messages.length - 1].id : null;
+                if (!forceScroll && newLastId === favoritesLastMessageId) return;
+                var wasAtBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 120;
+                var oldTop = body.scrollTop;
+                favoritesLastMessageId = newLastId;
+                renderFavoritesMessages(body, messages);
+                if (forceScroll || wasAtBottom) body.scrollTop = body.scrollHeight;
+                else body.scrollTop = oldTop;
+            }).catch(function () {});
+        }
+
+        function renderFavoritesMessages(body, messages) {
+            if (!messages.length) {
+                body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-3);">Здесь будут твои личные заметки и сохранённые сообщения.</div>';
+                return;
+            }
+            var html = '';
+            var lastDate = '';
+            messages.forEach(function (m) {
+                var d = new Date(m.createdAt);
+                var dayStr = d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-US');
+                if (dayStr !== lastDate) { lastDate = dayStr; html += '<div class="chat-date-sep"><span>' + escapeHtml(dayStr) + '</span></div>'; }
+                var favoriteImage = m.image ? '<img class="msg-image" src="' + escapeHtml(m.image) + '" alt="Фото из Избранного" style="max-width:100%;max-height:360px;border-radius:12px;display:block;margin-top:6px;">' : '';
+                html += '<div class="msg own" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '"><div class="msg-content"><div class="msg-bubble" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '">' + escapeHtml(m.text || '').replace(/\n/g, '<br>') + favoriteImage + '</div><div class="msg-meta">' + formatTime(m.createdAt) + '</div></div></div>';
+            });
+            body.innerHTML = html;
+            body.querySelectorAll('.msg-bubble').forEach(function (bubble) {
+                bubble.addEventListener('click', function (e) {
+                    if (e.defaultPrevented) return;
+                    bubble.classList.remove('message-highlight');
+                    void bubble.offsetWidth;
+                    bubble.classList.add('message-highlight');
+                });
+                var msgData = { id: bubble.getAttribute('data-msg-id'), text: bubble.getAttribute('data-msg-text') || '', from: bubble.getAttribute('data-msg-from') || '', source: 'favorites' };
+                var items = [{ action: 'delete', icon: hotIcon('trash',18), label: 'Удалить', danger: true, handler: function () {
+                    confirmDelete('Удалить это сообщение из Избранного?', function () {
+                        apiPost('/api/favorites/delete', { messageId: msgData.id }).then(function () {
+                            favoritesLastMessageId = null;
+                            loadFavoritesMessages(true);
+                            loadChatList();
+                        }).catch(function (e) { alert((e && e.message) || 'Не удалось удалить сообщение'); });
+                    });
+                } }, { action: 'cancel', icon: hotIcon('close',18), label: 'Отмена', danger: true }];
+                attachLongPress(bubble, msgData, items);
+            });
+        }
+
+        function stopFavoritesPolling() {
+            if (favoritesPollTimer) { clearInterval(favoritesPollTimer); favoritesPollTimer = null; }
         }
 
         function openDm(user) {
@@ -4265,7 +4433,15 @@ function showEmojiPicker(anchor, cb) {
                         + '</div>';
                 });
             }
+            html += '<div class="account-limit-note" style="margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--panel-hover);color:var(--text-3);font-size:12px;">Аккаунты на этом устройстве: ' + list.length + ' из ' + MAX_SAVED_ACCOUNTS + '. Максимум 3.</div>';
             accountsList.innerHTML = html;
+            var addAccountButton = document.getElementById('accounts-add');
+            if (addAccountButton) {
+                var isFull = list.length >= MAX_SAVED_ACCOUNTS;
+                addAccountButton.disabled = isFull;
+                addAccountButton.textContent = isFull ? 'Лимит 3/3' : 'Добавить аккаунт';
+                addAccountButton.title = isFull ? 'Удали один сохранённый аккаунт, чтобы добавить другой' : '';
+            }
             accountsList.querySelectorAll('.acc-switch-btn').forEach(function (btn) {
                 btn.addEventListener('click', function () { switchAccount(btn.getAttribute('data-target')); });
             });
@@ -4306,6 +4482,10 @@ function showEmojiPicker(anchor, cb) {
         document.getElementById('accounts-cancel').addEventListener('click', function () { accountsModal.classList.add('hidden'); });
         accountsModal.addEventListener('click', function (e) { if (e.target === accountsModal) accountsModal.classList.add('hidden'); });
         document.getElementById('accounts-add').addEventListener('click', function () {
+            if (getSavedAccounts().length >= MAX_SAVED_ACCOUNTS) {
+                alert('В Hot можно сохранить максимум 3 аккаунта на этом устройстве. Удали один из сохранённых аккаунтов и попробуй снова.');
+                return;
+            }
             accountsModal.classList.add('hidden');
             clearSession(); currentUser = null; dmPartner = null; clearChatElements();
             showAuth(); setMode('login');
@@ -4347,7 +4527,7 @@ function showEmojiPicker(anchor, cb) {
                     return;
                 }
                 submitBtn.disabled = true;
-                apiPost('/api/register', { username: username, email: email, password: password, acceptedPrivacy: true }).then(function (res) {
+                apiPost('/api/register', { username: username, email: email, password: password, acceptedPrivacy: true, deviceId: getOrCreateAccountDeviceId() }).then(function (res) {
                     setSession(res.token);
                     currentUser = res.user;
                     saveAccount({ username: res.user.username, avatar: res.user.avatar, handle: res.user.handle, token: res.token });
@@ -4358,7 +4538,7 @@ function showEmojiPicker(anchor, cb) {
                 if (!email) { errorEl.textContent = 'Введите имя или почту'; errorEl.classList.add('visible'); return; }
                 if (!password) { errorEl.textContent = 'Введите пароль'; errorEl.classList.add('visible'); return; }
                 submitBtn.disabled = true;
-                apiPost('/api/login', { login: email, password: password }).then(function (res) {
+                apiPost('/api/login', { login: email, password: password, deviceId: getOrCreateAccountDeviceId() }).then(function (res) {
                     setSession(res.token);
                     currentUser = res.user;
                     saveAccount({ username: res.user.username, avatar: res.user.avatar, handle: res.user.handle, token: res.token });
@@ -5025,7 +5205,7 @@ function showEmojiPicker(anchor, cb) {
                 errorEl.classList.add('visible');
                 return;
             }
-            apiPost('/api/auth/google', { credential: response.credential })
+            apiPost('/api/auth/google', { credential: response.credential, deviceId: getOrCreateAccountDeviceId() })
                 .then(finishSocialLogin)
                 .catch(function (err) {
                     errorEl.textContent = err && err.message ? err.message : 'Ошибка входа через Google';
