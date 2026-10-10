@@ -5,18 +5,89 @@ const crypto = require('crypto');
 const net = require('net');
 const https = require('https');
 const { parse: parseUrl } = require('url');
+const { execFileSync } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const USERS_FILE = path.join(__dirname, 'users.json');
-const POSTS_FILE = path.join(__dirname, 'posts.json');
-const DM_FILE = path.join(__dirname, 'dm.json');
-const CHANNELS_FILE = path.join(__dirname, 'channels.json');
-const CHATS_FILE = path.join(__dirname, 'chats.json');
-const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
-const RESET_FILE = path.join(__dirname, 'password_resets.json');
+
+// Persistent data directory. On Railway, attach a Volume at /app/data.
+// Railway then supplies RAILWAY_VOLUME_MOUNT_PATH automatically.
+const DATA_DIR = process.env.RAILWAY_VOLUME_MOUNT_PATH || process.env.HOT_DATA_DIR || path.join(__dirname, 'data');
 const HTML_FILE = path.join(__dirname, 'index.html');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
+const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
+const PERSISTENT_JSON_FILES = [
+    'users.json', 'posts.json', 'dm.json', 'favorites.json', 'channels.json',
+    'chats.json', 'sessions.json', 'password_resets.json', 'dm_pins.json'
+];
+
+try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+} catch (e) {
+    console.error('Не удалось создать папку постоянных данных:', e.message);
+}
+
+// Restore the user's downloaded Railway backup when it has been uploaded to
+// /app/data/hot-data-backup.tar.gz. This runs before empty JSON files are created.
+// The marker prevents the same archive from overwriting newer data on later boots.
+function restoreUploadedBackup() {
+    const backupPath = path.join(DATA_DIR, 'hot-data-backup.tar.gz');
+    const markerPath = path.join(DATA_DIR, '.hot-data-backup-restored');
+    if (!fs.existsSync(backupPath) || fs.existsSync(markerPath)) return;
+    try {
+        execFileSync('tar', ['-tzf', backupPath], { stdio: 'ignore' });
+        execFileSync('tar', ['-xzf', backupPath, '-C', DATA_DIR], { stdio: 'inherit' });
+        fs.writeFileSync(markerPath, new Date().toISOString() + '\n', 'utf8');
+        console.log('Hot: восстановлена резервная копия из ' + backupPath);
+    } catch (e) {
+        console.error('Hot: не удалось восстановить резервную копию. Архив оставлен на месте:', e.message);
+    }
+}
+restoreUploadedBackup();
+
+// One-time migration: when the volume is empty, copy any old JSON files and
+// uploaded media from the previous app folder. Existing volume files are never overwritten.
+function migrateLegacyData() {
+    let copied = 0;
+    for (const name of PERSISTENT_JSON_FILES) {
+        const oldPath = path.join(__dirname, name);
+        const newPath = path.join(DATA_DIR, name);
+        try {
+            if (oldPath !== newPath && fs.existsSync(oldPath) && !fs.existsSync(newPath)) {
+                fs.copyFileSync(oldPath, newPath);
+                copied++;
+            }
+        } catch (e) {
+            console.error('Не удалось перенести файл ' + name + ':', e.message);
+        }
+    }
+    const oldUploadDir = path.join(__dirname, 'uploads');
+    try {
+        if (oldUploadDir !== UPLOAD_DIR && fs.existsSync(oldUploadDir)) {
+            for (const name of fs.readdirSync(oldUploadDir)) {
+                const from = path.join(oldUploadDir, name);
+                const to = path.join(UPLOAD_DIR, name);
+                if (fs.statSync(from).isFile() && !fs.existsSync(to)) {
+                    fs.copyFileSync(from, to);
+                    copied++;
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Не удалось перенести старые загрузки:', e.message);
+    }
+    if (copied) console.log('Hot: перенесено файлов в хранилище:', copied);
+    console.log('Hot data directory:', DATA_DIR, '| Railway volume:', Boolean(process.env.RAILWAY_VOLUME_MOUNT_PATH));
+}
+migrateLegacyData();
+
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const POSTS_FILE = path.join(DATA_DIR, 'posts.json');
+const DM_FILE = path.join(DATA_DIR, 'dm.json');
+const FAVORITES_FILE = path.join(DATA_DIR, 'favorites.json');
+const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
+const CHATS_FILE = path.join(DATA_DIR, 'chats.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+const RESET_FILE = path.join(DATA_DIR, 'password_resets.json');
 
 const MAX_BODY_SIZE = 30 * 1024 * 1024;
 const DEFAULT_BODY_SIZE = 256 * 1024;
@@ -36,6 +107,7 @@ const LOGIN_MAX_ATTEMPTS = 8;
 const REGISTER_MAX_ATTEMPTS = 12;
 const rateBuckets = new Map();
 const SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
+const MAX_HOT_ACCOUNTS_PER_DEVICE = 3;
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '240353019911-kqidnu791scvkfq4f93sdoull23eonnk.apps.googleusercontent.com';
 
@@ -56,7 +128,7 @@ function popCallSignals(user) {
 }
 
 function ensureFile(filePath) { if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '[]', 'utf8'); }
-[USERS_FILE, POSTS_FILE, DM_FILE, CHANNELS_FILE, CHATS_FILE, SESSIONS_FILE, RESET_FILE].forEach(ensureFile);
+[USERS_FILE, POSTS_FILE, DM_FILE, FAVORITES_FILE, CHANNELS_FILE, CHATS_FILE, SESSIONS_FILE, RESET_FILE].forEach(ensureFile);
 
 function readJSON(fp) {
     let raw = '';
@@ -80,6 +152,8 @@ function readPosts() { return readJSON(POSTS_FILE); }
 function savePosts(p) { writeJSON(POSTS_FILE, p); }
 function readDms() { return readJSON(DM_FILE); }
 function saveDms(d) { writeJSON(DM_FILE, d); }
+function readFavorites() { return readJSON(FAVORITES_FILE); }
+function saveFavorites(d) { writeJSON(FAVORITES_FILE, d); }
 function readChannels() { return readJSON(CHANNELS_FILE); }
 function saveChannels(c) { writeJSON(CHANNELS_FILE, c); }
 function readChats() { return readJSON(CHATS_FILE); }
@@ -322,6 +396,30 @@ function hashPassword(password, salt) {
 function generateSalt() { return crypto.randomBytes(16).toString('hex'); }
 function generateToken() { return crypto.randomBytes(32).toString('hex'); }
 
+// Лимит новых аккаунтов на одном экземпляре браузера. Идентификатор создаётся
+// интерфейсом Hot и хранится в localStorage; он не является подтверждением личности.
+function normalizeAccountDeviceId(value) {
+    const id = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return /^[a-f0-9]{32}$/.test(id) ? id : '';
+}
+function countAccountsForDevice(users, deviceId) {
+    if (!deviceId) return 0;
+    return users.filter(function (u) {
+        return Array.isArray(u.accountDeviceIds) && u.accountDeviceIds.includes(deviceId);
+    }).length;
+}
+function canCreateAccountOnDevice(users, deviceId) {
+    return !!deviceId && countAccountsForDevice(users, deviceId) < MAX_HOT_ACCOUNTS_PER_DEVICE;
+}
+function rememberAccountDevice(user, users, deviceId) {
+    if (!user || !deviceId) return;
+    if (!Array.isArray(user.accountDeviceIds)) user.accountDeviceIds = [];
+    if (user.accountDeviceIds.includes(deviceId)) return;
+    if (countAccountsForDevice(users, deviceId) >= MAX_HOT_ACCOUNTS_PER_DEVICE) return;
+    user.accountDeviceIds.push(deviceId);
+}
+
+
 function createSession(username, ip, ua) {
     const sessions = readSessions().filter(s => Date.now() - s.createdAt < SESSION_TTL);
     const token = generateToken();
@@ -531,6 +629,8 @@ async function handleRegister(req, res) {
         const username = (data.username || '').trim();
         const email = (data.email || '').trim().replace(/[\s\u00A0\u200B\uFEFF]/g, '');
         const password = data.password || '';
+        const accountDeviceId = normalizeAccountDeviceId(data.deviceId);
+        if (!accountDeviceId) return sendJSON(res, 400, { error: 'Обнови страницу Hot перед регистрацией и попробуй снова' });
         if (!HANDLE_RE.test(username)) return sendJSON(res, 400, { error: 'Ник: 3-20 символов, только латиница, цифры и _' });
         if (isSystemUser(username)) return sendJSON(res, 400, { error: 'Это имя зарезервировано' });
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJSON(res, 400, { error: 'Некорректный email' });
@@ -539,7 +639,10 @@ async function handleRegister(req, res) {
         if (password.length > 200) return sendJSON(res, 400, { error: 'Пароль слишком длинный' });
         const users = readUsers();
         if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) return sendJSON(res, 409, { error: 'Такое имя уже занято' });
-        if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) return sendJSON(res, 409, { error: 'Эта почта уже зарегистрирована' });
+        if (users.some(u => String(u.email || '').toLowerCase() === email.toLowerCase())) return sendJSON(res, 409, { error: 'Эта почта уже зарегистрирована' });
+        if (!canCreateAccountOnDevice(users, accountDeviceId)) {
+            return sendJSON(res, 403, { error: 'На одном устройстве можно создать не более 3 аккаунтов Hot' });
+        }
         const salt = generateSalt();
         const newUser = {
             username, email, salt,
@@ -548,6 +651,7 @@ async function handleRegister(req, res) {
             friends: [], incomingRequests: [], blocked: [],
             privacyAcceptedAt: new Date().toISOString(), privacyVersion: '2026-10-04',
             devices: [deviceKey(getClientIP(req), getClientAgent(req))],
+            accountDeviceIds: [accountDeviceId],
             createdAt: new Date().toISOString(), lastSeen: new Date().toISOString(), adminRole: username.toLowerCase() === 'dev' ? 'founder' : null
         };
         users.push(newUser);
@@ -571,6 +675,7 @@ async function handleLogin(req, res) {
         const data = await readBody(req);
         const login = (data.login || '').trim().toLowerCase();
         const password = data.password || '';
+        const accountDeviceId = normalizeAccountDeviceId(data.deviceId);
         if (!login || !password) return sendJSON(res, 400, { error: 'Введите логин и пароль' });
         const users = readUsers();
         if (password.length > 200) return sendJSON(res, 400, { error: 'Пароль слишком длинный' });
@@ -596,6 +701,7 @@ async function handleLogin(req, res) {
         const known = Array.isArray(user.devices) ? user.devices : null;
         const isNewDevice = known !== null && !known.includes(dKey);
         user.devices = (known || []).filter(k => k !== dKey).concat(dKey).slice(-20);
+        rememberAccountDevice(user, users, accountDeviceId);
         saveUsers(users);
         const token = createSession(user.username, currentIP, currentUA);
         if (isNewDevice) { try { sendSecurityNotice(user.username, currentIP, currentUA); } catch (e) { console.error('HOT security notice error:', e); } }
@@ -665,7 +771,7 @@ function publicUser(user) {
     };
 }
 
-function loginOrCreateSocialUser(provider, providerId, profile, ip, ua) {
+function loginOrCreateSocialUser(provider, providerId, profile, ip, ua, deviceId) {
     const users = readUsers();
     const id = String(providerId || '').trim();
     const email = String(profile.email || '').trim().toLowerCase();
@@ -680,12 +786,16 @@ function loginOrCreateSocialUser(provider, providerId, profile, ip, ua) {
     }
 
     if (!user) {
+        if (!canCreateAccountOnDevice(users, deviceId)) {
+            throw new Error(deviceId ? 'На одном устройстве можно создать не более 3 аккаунтов Hot' : 'Обнови страницу Hot и попробуй снова');
+        }
         user = {
             username: oauthUsername(profile.name || profile.firstName || 'user', email, users),
             email: email || (provider + '_' + id + '@oauth.local'),
             salt: '', passwordHash: '',
             avatar: profile.avatar || '', handle: '', theme: 'dark', wallpaper: '', birthday: '',
             friends: [], incomingRequests: [], blocked: [],
+            accountDeviceIds: [deviceId],
             createdAt: new Date().toISOString(), lastSeen: new Date().toISOString()
         };
         user[provider + 'Id'] = id;
@@ -695,6 +805,7 @@ function loginOrCreateSocialUser(provider, providerId, profile, ip, ua) {
         if (!user.avatar && profile.avatar) user.avatar = profile.avatar;
         if (profile.email && !user.email) user.email = profile.email;
         user.lastSeen = new Date().toISOString();
+        rememberAccountDevice(user, users, deviceId);
     }
     saveUsers(users);
     const token = createSession(user.username, ip, ua);
@@ -727,11 +838,12 @@ async function handleGoogleAuth(req, res) {
         }
         const currentIP = getClientIP(req);
         const currentUA = getClientAgent(req);
+        const accountDeviceId = normalizeAccountDeviceId(data.deviceId);
         const result = loginOrCreateSocialUser('google', info.sub, {
             name: info.name || info.email,
             email: info.email,
             avatar: info.picture || ''
-        }, currentIP, currentUA);
+        }, currentIP, currentUA, accountDeviceId);
         sendJSON(res, 200, result);
     } catch (e) {
         sendJSON(res, 401, { error: 'Ошибка авторизации Google: ' + (e.message || 'неизвестная ошибка') });
@@ -1869,7 +1981,7 @@ async function handleChatMessageDelete(req, res) {
     } catch (e) { sendFail(res, e); }
 }
 
-const DM_PINS_FILE = path.join(__dirname, 'dm_pins.json');
+const DM_PINS_FILE = path.join(DATA_DIR, 'dm_pins.json');
 function readDmPins(){ try{ return JSON.parse(fs.readFileSync(DM_PINS_FILE,'utf8')); }catch(e){ return {}; } }
 function saveDmPins(x){ fs.writeFileSync(DM_PINS_FILE, JSON.stringify(x,null,2)); }
 function getDmPinnedMessageId(key){ return readDmPins()[key] || null; }
@@ -2018,6 +2130,72 @@ async function handleDmDelete(req, res) {
     } catch (e) { sendFail(res, e); }
 }
 
+/* ========== FAVORITES / SELF NOTES ========== */
+function handleFavoritesGet(req, res) {
+    const me = authUser(req);
+    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    const key = String(me.username || '').toLowerCase();
+    const record = readFavorites().find(function (x) {
+        return String(x.username || '').toLowerCase() === key;
+    });
+    const messages = record && Array.isArray(record.messages) ? record.messages : [];
+    sendJSON(res, 200, { messages: messages.slice(-DM_HISTORY_LIMIT) });
+}
+async function handleFavoritesCreate(req, res) {
+    try {
+        const me = authUser(req);
+        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const data = await readBody(req);
+        const text = String(data.text || '').trim();
+        const image = processImageInput(typeof data.image === 'string' ? data.image : '', true);
+        if (image === null) return sendJSON(res, 400, { error: 'Фото: разрешены PNG, JPG, WEBP или GIF до 5 МБ' });
+        if (!text && !image) return sendJSON(res, 400, { error: 'Напиши текст или выбери фото' });
+        if (text.length > MAX_MESSAGE_LEN) return sendJSON(res, 400, { error: 'Сообщение слишком длинное (до ' + MAX_MESSAGE_LEN + ' символов)' });
+        const cdWait = msgCooldownLeft(me.username);
+        if (cdWait > 0) return cooldownReply(res, cdWait);
+
+        const all = readFavorites();
+        const key = String(me.username || '').toLowerCase();
+        let record = all.find(function (x) { return String(x.username || '').toLowerCase() === key; });
+        if (!record) {
+            record = { username: me.username, messages: [] };
+            all.push(record);
+        }
+        if (!Array.isArray(record.messages)) record.messages = [];
+        const message = {
+            id: makeId(),
+            from: me.username,
+            text: text,
+            image: image,
+            createdAt: new Date().toISOString()
+        };
+        record.messages.push(message);
+        if (record.messages.length > DM_HISTORY_LIMIT) record.messages = record.messages.slice(-DM_HISTORY_LIMIT);
+        record.username = me.username;
+        msgCooldownMark(me.username);
+        saveFavorites(all);
+        sendJSON(res, 201, { message: message });
+    } catch (e) { sendFail(res, e); }
+}
+async function handleFavoritesDelete(req, res) {
+    try {
+        const me = authUser(req);
+        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const data = await readBody(req);
+        const messageId = String(data.messageId || '').trim();
+        if (!messageId) return sendJSON(res, 400, { error: 'Не указано сообщение' });
+        const all = readFavorites();
+        const key = String(me.username || '').toLowerCase();
+        const record = all.find(function (x) { return String(x.username || '').toLowerCase() === key; });
+        if (!record || !Array.isArray(record.messages)) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
+        const index = record.messages.findIndex(function (m) { return String(m.id || '') === messageId; });
+        if (index < 0) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
+        record.messages.splice(index, 1);
+        saveFavorites(all);
+        sendJSON(res, 200, { ok: true });
+    } catch (e) { sendFail(res, e); }
+}
+
 /* ========== COMMUNICATION ========== */
 
 function handleCommunication(req, res, query) {
@@ -2149,6 +2327,10 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/dm/pin' && req.method === 'POST') return handleDmPin(req, res);
     if (url === '/api/dm/conversations' && req.method === 'GET') return handleDmConversations(req, res, query);
     if (url === '/api/dm/unread-count' && req.method === 'GET') return handleDmUnreadCount(req, res, query);
+
+    if (url === '/api/favorites' && req.method === 'GET') return handleFavoritesGet(req, res);
+    if (url === '/api/favorites' && req.method === 'POST') return handleFavoritesCreate(req, res);
+    if (url === '/api/favorites/delete' && req.method === 'POST') return handleFavoritesDelete(req, res);
 
     if (url === '/api/communication' && req.method === 'GET') return handleCommunication(req, res, query);
     if (url === '/api/communication/unread-count' && req.method === 'GET') return handleCommunicationUnreadCount(req, res, query);
