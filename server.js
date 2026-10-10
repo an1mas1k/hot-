@@ -13,6 +13,7 @@ const DM_FILE = path.join(__dirname, 'dm.json');
 const CHANNELS_FILE = path.join(__dirname, 'channels.json');
 const CHATS_FILE = path.join(__dirname, 'chats.json');
 const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
+const RESET_FILE = path.join(__dirname, 'password_resets.json');
 const HTML_FILE = path.join(__dirname, 'index.html');
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
@@ -55,7 +56,7 @@ function popCallSignals(user) {
 }
 
 function ensureFile(filePath) { if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '[]', 'utf8'); }
-[USERS_FILE, POSTS_FILE, DM_FILE, CHANNELS_FILE, CHATS_FILE, SESSIONS_FILE].forEach(ensureFile);
+[USERS_FILE, POSTS_FILE, DM_FILE, CHANNELS_FILE, CHATS_FILE, SESSIONS_FILE, RESET_FILE].forEach(ensureFile);
 
 function readJSON(fp) {
     let raw = '';
@@ -408,9 +409,9 @@ function ensureDevFounder(user){
 }
 function isDevUser(user){ return !!user && String(user.username||'').toLowerCase()==='dev'; }
 function adminRoleLabel(role){
-    if(role==='founder') return '★ Основатель';
-    if(role==='admin') return '🛡 Администратор';
-    if(role==='moderator') return '🔨 Модератор';
+    if(role==='founder') return 'Основатель';
+    if(role==='admin') return 'Администратор';
+    if(role==='moderator') return 'Модератор';
     return '';
 }
 function adminDisplayName(user){
@@ -468,7 +469,7 @@ async function handleAdminAction(req,res){
             const text=String(data.text||'').trim(); if(!text)return sendJSON(res,400,{error:'Введите сообщение'});
             if(text.length>5000)return sendJSON(res,400,{error:'Сообщение слишком длинное'});
             const asUser=String(data.asUser||'').trim();
-            let from='★ Основатель | Dev';
+            let from='Основатель | Dev';
             if(asUser){
                 const au=readUsers().find(function(u){return !u.system && String(u.username||'').toLowerCase()===asUser.toLowerCase();});
                 if(!au)return sendJSON(res,404,{error:'Пользователь для отправки не найден'});
@@ -491,7 +492,7 @@ async function handleAdminAction(req,res){
             const text=String(data.text||'').trim(); if(!text)return sendJSON(res,400,{error:'Введите сообщение'});
             if(text.length>5000)return sendJSON(res,400,{error:'Сообщение слишком длинное'});
             const asUser=String(data.asUser||'').trim();
-            let from='★ Основатель | Dev';
+            let from='Основатель | Dev';
             if(asUser){
                 const au=readUsers().find(function(u){return !u.system && String(u.username||'').toLowerCase()===asUser.toLowerCase();});
                 if(!au)return sendJSON(res,404,{error:'Пользователь для отправки не найден'});
@@ -759,6 +760,178 @@ function handleLogout(req, res) {
     sendJSON(res, 200, { ok: true });
 }
 
+/* ========== ВОССТАНОВЛЕНИЕ ПАРОЛЯ (EmailJS) ========== */
+// Коды хранятся в password_resets.json рядом с users.json. Хранится не сам код, а его scrypt-хеш с отдельным salt.
+// Счётчик попыток тоже лежит в файле, поэтому перезапуск сервера не даёт «обнулить» попытки.
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || 'service_hot_gmail';
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || 'template_ckmu3u4';
+const RESET_CODE_TTL_MS = 10 * 60 * 1000;
+const RESET_CODE_MAX_ATTEMPTS = 5;
+const RESET_RESEND_COOLDOWN_MS = 60 * 1000;
+const RESET_REQUEST_IP_MAX = 6;
+const RESET_REQUEST_EMAIL_MAX = 3;
+const RESET_CONFIRM_IP_MAX = 15;
+const resetLastRequest = new Map();
+
+function readResets() { const v = readJSON(RESET_FILE); return Array.isArray(v) ? v : []; }
+function saveResets(list) { writeJSON(RESET_FILE, list); }
+function aliveResets(list) { const now = Date.now(); return list.filter(function (r) { return r && r.expiresAt > now; }); }
+function normalizeResetEmail(raw) {
+    if (typeof raw !== 'string') return '';
+    const email = raw.trim().replace(/[\s\u00A0\u200B\uFEFF]/g, '').toLowerCase();
+    if (!email || email.length > 254) return '';
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? email : '';
+}
+function generateResetCode() { return String(crypto.randomInt(0, 1000000)).padStart(6, '0'); }
+function hashResetCode(code, email, salt) { return hashPassword(code + '|' + email, salt); }
+
+function sendResetEmail(email, code) {
+    return new Promise(function (resolve, reject) {
+        const publicKey = process.env.EMAILJS_PUBLIC_KEY;
+        if (!publicKey) return reject(new Error('EMAILJS_PUBLIC_KEY не задан'));
+        const payload = {
+            service_id: EMAILJS_SERVICE_ID,
+            template_id: EMAILJS_TEMPLATE_ID,
+            user_id: publicKey,
+            template_params: { email: email, passcode: code }
+        };
+        // Необязательно: если в EmailJS включена защита Private Key, добавь EMAILJS_PRIVATE_KEY в Railway Variables.
+        if (process.env.EMAILJS_PRIVATE_KEY) payload.accessToken = process.env.EMAILJS_PRIVATE_KEY;
+        const body = JSON.stringify(payload);
+        const r = https.request({
+            hostname: 'api.emailjs.com',
+            path: '/api/v1.0/email/send',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+        }, function (response) {
+            let text = '';
+            response.setEncoding('utf8');
+            response.on('data', function (chunk) { if (text.length < 500) text += chunk; });
+            response.on('end', function () {
+                if (response.statusCode >= 200 && response.statusCode < 300) return resolve();
+                reject(new Error('EmailJS ответил HTTP ' + response.statusCode + ': ' + text.slice(0, 200)));
+            });
+        });
+        r.setTimeout(15000, function () { r.destroy(new Error('EmailJS: превышено время ожидания')); });
+        r.on('error', reject);
+        r.write(body);
+        r.end();
+    });
+}
+
+async function handlePasswordResetRequest(req, res) {
+    try {
+        const retryIp = rateLimit(req, 'reset-request', RESET_REQUEST_IP_MAX);
+        if (retryIp) return sendJSON(res, 429, { error: 'Слишком много запросов. Попробуй позже', retryAfter: retryIp });
+        const data = await readBody(req, 4096);
+        const email = normalizeResetEmail(data.email);
+        if (!email) return sendJSON(res, 400, { error: 'Введите корректную почту' });
+        if (!process.env.EMAILJS_PUBLIC_KEY) {
+            console.error('Восстановление пароля: не задана переменная EMAILJS_PUBLIC_KEY');
+            return sendJSON(res, 503, { error: 'Восстановление пароля временно недоступно' });
+        }
+        // Пауза и лимит считаются по адресу почты независимо от того, есть ли такой аккаунт, чтобы ответы ничего не выдавали.
+        const now = Date.now();
+        const last = resetLastRequest.get(email) || 0;
+        if (now - last < RESET_RESEND_COOLDOWN_MS) {
+            const wait = Math.ceil((RESET_RESEND_COOLDOWN_MS - (now - last)) / 1000);
+            return sendJSON(res, 429, { error: 'Код уже отправлен. Повторить можно через ' + wait + ' сек.', retryAfter: wait });
+        }
+        const retryEmail = rateLimit(req, 'reset-email', RESET_REQUEST_EMAIL_MAX, email);
+        if (retryEmail) return sendJSON(res, 429, { error: 'Слишком много запросов для этой почты. Попробуй позже', retryAfter: retryEmail });
+        resetLastRequest.set(email, now);
+        if (resetLastRequest.size > 5000) {
+            for (const [k, t] of resetLastRequest) if (now - t >= RESET_RESEND_COOLDOWN_MS) resetLastRequest.delete(k);
+        }
+
+        const user = readUsers().find(function (u) {
+            return !u.system && u.passwordHash && String(u.email || '').toLowerCase() === email;
+        });
+        if (user) {
+            const code = generateResetCode();
+            const salt = generateSalt();
+            const record = {
+                email: email, username: user.username, salt: salt,
+                codeHash: hashResetCode(code, email, salt),
+                attempts: 0, createdAt: now, expiresAt: now + RESET_CODE_TTL_MS
+            };
+            const list = aliveResets(readResets()).filter(function (r) { return r.email !== email; });
+            list.push(record);
+            saveResets(list);
+            // Письмо уходит в фоне, чтобы время ответа не показывало, есть ли такая почта в Hot.
+            sendResetEmail(email, code).catch(function (err) {
+                console.error('Восстановление пароля: письмо не отправлено —', err && err.message ? err.message : 'неизвестная ошибка');
+                try { saveResets(readResets().filter(function (r) { return r.codeHash !== record.codeHash; })); } catch (e) {}
+            });
+        } else {
+            hashResetCode('000000', email, 'dummy-salt-for-timing');
+        }
+        sendJSON(res, 200, {
+            ok: true,
+            expiresInSec: Math.round(RESET_CODE_TTL_MS / 1000),
+            cooldownSec: Math.round(RESET_RESEND_COOLDOWN_MS / 1000),
+            message: 'Если эта почта зарегистрирована в Hot, мы отправили на неё код'
+        });
+    } catch (e) { sendFail(res, e); }
+}
+
+async function handlePasswordResetConfirm(req, res) {
+    try {
+        const retryIp = rateLimit(req, 'reset-confirm', RESET_CONFIRM_IP_MAX);
+        if (retryIp) return sendJSON(res, 429, { error: 'Слишком много попыток. Попробуй позже', retryAfter: retryIp });
+        const data = await readBody(req, 4096);
+        const email = normalizeResetEmail(data.email);
+        const code = typeof data.code === 'string' ? data.code.trim() : '';
+        const password = typeof data.password === 'string' ? data.password : '';
+        if (!email) return sendJSON(res, 400, { error: 'Введите корректную почту' });
+        if (!/^\d{6}$/.test(code)) return sendJSON(res, 400, { error: 'Код состоит из 6 цифр' });
+        if (password.length < 6) return sendJSON(res, 400, { error: 'Пароль — минимум 6 символов' });
+        if (password.length > 200) return sendJSON(res, 400, { error: 'Пароль слишком длинный' });
+
+        const BAD_CODE = 'Неверный или просроченный код. Запроси новый код';
+        const all = readResets();
+        const list = aliveResets(all);
+        const rec = list.find(function (r) { return r.email === email; });
+        if (!rec) {
+            hashResetCode(code, email, 'dummy-salt-for-timing');
+            if (list.length !== all.length) saveResets(list);
+            return sendJSON(res, 400, { error: BAD_CODE });
+        }
+        if (!safeEqualHex(hashResetCode(code, email, rec.salt), rec.codeHash)) {
+            rec.attempts = (rec.attempts || 0) + 1;
+            const next = rec.attempts >= RESET_CODE_MAX_ATTEMPTS ? list.filter(function (r) { return r !== rec; }) : list;
+            saveResets(next);
+            return sendJSON(res, 400, { error: BAD_CODE });
+        }
+
+        // Код верный: он больше не нужен ни при каком исходе (одноразовый).
+        const rest = list.filter(function (r) { return r.email !== email; });
+        const users = readUsers();
+        const user = users.find(function (u) {
+            return String(u.username || '').toLowerCase() === String(rec.username || '').toLowerCase()
+                && String(u.email || '').toLowerCase() === email && !u.system && u.passwordHash;
+        });
+        if (!user) { saveResets(rest); return sendJSON(res, 400, { error: BAD_CODE }); }
+        user.salt = generateSalt();
+        user.passwordHash = hashPassword(password, user.salt);
+        saveUsers(users);
+        saveResets(rest);
+        destroyUserSessions(user.username);
+        failBuckets.delete(String(user.username).toLowerCase());
+        failBuckets.delete(email);
+        try {
+            const dms = readDms();
+            dms.push({
+                id: makeId(), from: SYSTEM_USER, to: user.username,
+                text: 'Пароль изменён\n\nПароль от аккаунта был изменён через восстановление по почте. Все старые сессии завершены.\nВремя: {{time:' + new Date().toISOString() + '}}\n\nЕсли это был не ты, срочно сообщи администратору Hot.',
+                system: true, delivered: true, read: false, createdAt: new Date().toISOString()
+            });
+            saveDms(trimDms(dms));
+        } catch (e) { console.error('HOT уведомление о смене пароля не записано'); }
+        sendJSON(res, 200, { ok: true, message: 'Пароль изменён. Теперь войди с новым паролем' });
+    } catch (e) { sendFail(res, e); }
+}
+
 /* ========== HEARTBEAT / STATUS ========== */
 
 async function handleHeartbeat(req, res) {
@@ -798,7 +971,7 @@ async function handleCallSignalSend(req, res) {
         const from = me.username;
         if (!to || !type) return sendJSON(res, 400, { error: 'Missing call params' });
         if (typeof to !== 'string' || !CALL_TYPES.includes(type)) return sendJSON(res, 400, { error: 'Некорректный сигнал' });
-        if (sdp !== undefined && (typeof sdp !== 'string' || sdp.length > 30000)) return sendJSON(res, 400, { error: 'Некорректный сигнал' });
+        if (sdp !== undefined && (typeof sdp !== 'string' || sdp.length > 80000)) return sendJSON(res, 400, { error: 'Некорректный сигнал' });
         if (candidate !== undefined && JSON.stringify(candidate).length > 3000) return sendJSON(res, 400, { error: 'Некорректный сигнал' });
         const retry = rateLimit(req, 'callsig', 800, me.username);
         if (retry) return sendJSON(res, 429, { error: 'Слишком много запросов', retryAfter: retry });
@@ -1913,6 +2086,8 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/register' && req.method === 'POST') return handleRegister(req, res);
     if (url === '/api/login' && req.method === 'POST') return handleLogin(req, res);
     if (url === '/api/auth/google' && req.method === 'POST') return handleGoogleAuth(req, res);
+    if (url === '/api/password-reset/request' && req.method === 'POST') return handlePasswordResetRequest(req, res);
+    if (url === '/api/password-reset/confirm' && req.method === 'POST') return handlePasswordResetConfirm(req, res);
     if (url === '/api/logout' && req.method === 'POST') return handleLogout(req, res);
     if (url === '/api/auth/session' && req.method === 'GET') return handleSession(req, res);
     if ((url === '/api/admin/panel' || url === '/api/admin/users') && req.method === 'GET') return handleAdminPanel(req, res);
