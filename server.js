@@ -1279,94 +1279,157 @@ async function handleUpdateProfile(req, res) {
 }
 
 /* ========== FRIENDS ========== */
+// Compare names consistently even if old data contains different letter casing.
+function friendNameKey(value) {
+    return String(value == null ? '' : value).trim().toLowerCase();
+}
+function friendListHas(list, name) {
+    const key = friendNameKey(name);
+    return !!key && Array.isArray(list) && list.some(function (item) { return friendNameKey(item) === key; });
+}
+function friendListAdd(list, name) {
+    if (Array.isArray(list) && name && !friendListHas(list, name)) list.push(name);
+}
+function friendListRemove(list, name) {
+    const key = friendNameKey(name);
+    return (Array.isArray(list) ? list : []).filter(function (item) { return friendNameKey(item) !== key; });
+}
+function getFriendRelationStatus(meUser, targetUser) {
+    const meName = meUser && meUser.username;
+    const targetName = targetUser && targetUser.username;
+    // Treat a friendship recorded on either side as the same relationship.
+    const isFriends = friendListHas(meUser && meUser.friends, targetName) || friendListHas(targetUser && targetUser.friends, meName);
+    const isSent = friendListHas(targetUser && targetUser.incomingRequests, meName);
+    const isReceived = friendListHas(meUser && meUser.incomingRequests, targetName);
+    if (isFriends) return 'friends';
+    if (isReceived) return 'received';
+    if (isSent) return 'sent';
+    return 'none';
+}
 
 async function handleFriendAction(req, res) {
     try {
-        const me = authUser(req);
-        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const sessionUser = authUser(req);
+        if (!sessionUser) return sendJSON(res, 401, { error: 'Не авторизован' });
         const data = await readBody(req);
-        const target = (data.target || '').trim();
-        const action = (data.action || '').trim();
+        const target = String(data.target || '').trim();
+        const action = String(data.action || '').trim().toLowerCase();
         if (!target || !action) return sendJSON(res, 400, { error: 'Недостаточно данных' });
-        if (me.username.toLowerCase() === target.toLowerCase()) return sendJSON(res, 400, { error: 'Нельзя выполнить действие с собой' });
+        if (friendNameKey(sessionUser.username) === friendNameKey(target)) return sendJSON(res, 400, { error: 'Нельзя выполнить действие с собой' });
+
         const users = readUsers();
-        const meUser = users.find(u => u.username.toLowerCase() === me.username.toLowerCase());
-        const targetUser = users.find(u => u.username.toLowerCase() === target.toLowerCase());
+        const meUser = users.find(function (u) { return friendNameKey(u.username) === friendNameKey(sessionUser.username); });
+        const targetUser = users.find(function (u) { return friendNameKey(u.username) === friendNameKey(target); });
         if (!meUser || !targetUser) return sendJSON(res, 404, { error: 'Пользователь не найден' });
         if (targetUser.system) return sendJSON(res, 403, { error: 'Служебный аккаунт' });
+
         if (!Array.isArray(meUser.friends)) meUser.friends = [];
         if (!Array.isArray(targetUser.friends)) targetUser.friends = [];
         if (!Array.isArray(meUser.incomingRequests)) meUser.incomingRequests = [];
         if (!Array.isArray(targetUser.incomingRequests)) targetUser.incomingRequests = [];
-        const lowerMe = meUser.username.toLowerCase();
-        const lowerTarget = targetUser.username.toLowerCase();
+
         if (action === 'send') {
-            if ((meUser.blocked || []).some(b => b.toLowerCase() === lowerTarget)) return sendJSON(res, 403, { error: 'Вы заблокировали этого пользователя' });
-            if ((targetUser.blocked || []).some(b => b.toLowerCase() === lowerMe)) return sendJSON(res, 403, { error: 'Пользователь заблокировал вас' });
-            if (!targetUser.incomingRequests.some(r => r.toLowerCase() === lowerMe)) targetUser.incomingRequests.push(meUser.username);
+            if (friendListHas(meUser.blocked, targetUser.username)) return sendJSON(res, 403, { error: 'Вы заблокировали этого пользователя' });
+            if (friendListHas(targetUser.blocked, meUser.username)) return sendJSON(res, 403, { error: 'Пользователь заблокировал вас' });
+
+            // Repair old one-sided friendship data rather than showing "Добавить в друзья".
+            if (friendListHas(meUser.friends, targetUser.username) || friendListHas(targetUser.friends, meUser.username)) {
+                friendListAdd(meUser.friends, targetUser.username);
+                friendListAdd(targetUser.friends, meUser.username);
+                meUser.incomingRequests = friendListRemove(meUser.incomingRequests, targetUser.username);
+                targetUser.incomingRequests = friendListRemove(targetUser.incomingRequests, meUser.username);
+            } else if (friendListHas(meUser.incomingRequests, targetUser.username)) {
+                // The other person already sent a request: keep it as a received request.
+            } else {
+                friendListAdd(targetUser.incomingRequests, meUser.username);
+            }
         } else if (action === 'cancel') {
-            targetUser.incomingRequests = targetUser.incomingRequests.filter(r => r.toLowerCase() !== lowerMe);
+            targetUser.incomingRequests = friendListRemove(targetUser.incomingRequests, meUser.username);
         } else if (action === 'accept') {
-            meUser.incomingRequests = meUser.incomingRequests.filter(r => r.toLowerCase() !== lowerTarget);
-            if (!meUser.friends.some(f => f.toLowerCase() === lowerTarget)) meUser.friends.push(targetUser.username);
-            if (!targetUser.friends.some(f => f.toLowerCase() === lowerMe)) targetUser.friends.push(meUser.username);
+            meUser.incomingRequests = friendListRemove(meUser.incomingRequests, targetUser.username);
+            targetUser.incomingRequests = friendListRemove(targetUser.incomingRequests, meUser.username);
+            friendListAdd(meUser.friends, targetUser.username);
+            friendListAdd(targetUser.friends, meUser.username);
         } else if (action === 'decline') {
-            meUser.incomingRequests = meUser.incomingRequests.filter(r => r.toLowerCase() !== lowerTarget);
+            meUser.incomingRequests = friendListRemove(meUser.incomingRequests, targetUser.username);
         } else if (action === 'remove') {
-            meUser.friends = meUser.friends.filter(f => f.toLowerCase() !== lowerTarget);
-            targetUser.friends = targetUser.friends.filter(f => f.toLowerCase() !== lowerMe);
+            meUser.friends = friendListRemove(meUser.friends, targetUser.username);
+            targetUser.friends = friendListRemove(targetUser.friends, meUser.username);
+            meUser.incomingRequests = friendListRemove(meUser.incomingRequests, targetUser.username);
+            targetUser.incomingRequests = friendListRemove(targetUser.incomingRequests, meUser.username);
+        } else {
+            return sendJSON(res, 400, { error: 'Неизвестное действие с друзьями' });
         }
+
         saveUsers(users);
-        sendJSON(res, 200, { ok: true, meFriends: meUser.friends, incomingCount: meUser.incomingRequests.length });
+        sendJSON(res, 200, {
+            ok: true,
+            status: getFriendRelationStatus(meUser, targetUser),
+            meFriends: meUser.friends,
+            incomingCount: meUser.incomingRequests.length
+        });
     } catch (e) { sendFail(res, e); }
 }
+
 function handleFriendStatus(req, res, query) {
-    const me = authUser(req);
-    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
-    const target = (query.target || '').trim().toLowerCase();
+    const sessionUser = authUser(req);
+    if (!sessionUser) return sendJSON(res, 401, { error: 'Не авторизован' });
+    const target = friendNameKey(query.target || '');
     const users = readUsers();
-    const meUser = users.find(u => u.username.toLowerCase() === me.username.toLowerCase());
-    const targetUser = users.find(u => u.username.toLowerCase() === target);
+    const meUser = users.find(function (u) { return friendNameKey(u.username) === friendNameKey(sessionUser.username); });
+    const targetUser = users.find(function (u) { return friendNameKey(u.username) === target; });
     if (!meUser || !targetUser) return sendJSON(res, 404, { error: 'Пользователь не найден' });
-    const isFriends = (meUser.friends || []).some(f => f.toLowerCase() === target);
-    const isSent = (targetUser.incomingRequests || []).some(r => r.toLowerCase() === me.username.toLowerCase());
-    const isReceived = (meUser.incomingRequests || []).some(r => r.toLowerCase() === target);
-    let status = 'none';
-    if (isFriends) status = 'friends';
-    else if (isReceived) status = 'received';
-    else if (isSent) status = 'sent';
-    sendJSON(res, 200, { status });
+    sendJSON(res, 200, { status: getFriendRelationStatus(meUser, targetUser) });
 }
+
 function handleFriendsGet(req, res, query) {
-    const me = authUser(req);
-    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    const sessionUser = authUser(req);
+    if (!sessionUser) return sendJSON(res, 401, { error: 'Не авторизован' });
     const users = readUsers();
-    const user = users.find(u => u.username.toLowerCase() === me.username.toLowerCase());
+    const user = users.find(function (u) { return friendNameKey(u.username) === friendNameKey(sessionUser.username); });
     if (!user) return sendJSON(res, 404, { error: 'Пользователь не найден' });
-    const friendNames = Array.isArray(user.friends) ? user.friends : [];
-    const friends = users.filter(u => friendNames.some(fn => fn.toLowerCase() === u.username.toLowerCase())).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '', birthday: u.birthday || '' }));
+    const friends = users.filter(function (u) {
+        if (friendNameKey(u.username) === friendNameKey(user.username) || u.system) return false;
+        // Use both sides so a legacy one-sided record does not disappear after refresh.
+        return friendListHas(user.friends, u.username) || friendListHas(u.friends, user.username);
+    }).map(function (u) {
+        return { username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '', birthday: u.birthday || '' };
+    });
     const reqNames = Array.isArray(user.incomingRequests) ? user.incomingRequests : [];
-    const requests = users.filter(u => reqNames.some(rn => rn.toLowerCase() === u.username.toLowerCase())).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '' }));
+    const requests = users.filter(function (u) {
+        return !u.system && friendListHas(reqNames, u.username);
+    }).map(function (u) {
+        return { username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '' };
+    });
     sendJSON(res, 200, { friends, requests });
 }
 
 /* ========== USERS ========== */
 
 function handleUsersList(req, res) {
-    const me = authUser(req);
+    const sessionUser = authUser(req);
+    if (!sessionUser) return sendJSON(res, 401, { error: 'Не авторизован' });
+    // Read the users file once, then derive the signed-in user and all statuses from the same snapshot.
+    const allUsers = readUsers();
+    const me = allUsers.find(function (u) { return friendNameKey(u.username) === friendNameKey(sessionUser.username); });
     if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
-    const safe = readUsers()
-        .filter(u => !u.system)
-        .map(u => {
-            const uLower = String(u.username || '').toLowerCase();
-            const meLower = me.username.toLowerCase();
-            return {
-                username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '', theme: u.theme || 'dark', friends: u.friends || [], lastSeen: u.lastSeen || u.createdAt, createdAt: u.createdAt,
-                isFriend: (u.friends || []).some(f => String(f).toLowerCase() === meLower) || (me.friends || []).some(f => String(f).toLowerCase() === uLower),
-                requestSent: (u.incomingRequests || []).some(r => String(r).toLowerCase() === meLower),
-                requestReceived: (me.incomingRequests || []).some(r => String(r).toLowerCase() === uLower)
-            };
-        });
+    const meLower = friendNameKey(me.username);
+    const safe = allUsers.filter(function (u) { return !u.system; }).map(function (u) {
+        const uLower = friendNameKey(u.username);
+        return {
+            username: u.username,
+            displayName: adminDisplayName(u),
+            avatar: u.avatar || '',
+            handle: u.handle || '',
+            theme: u.theme || 'dark',
+            friends: Array.isArray(u.friends) ? u.friends : [],
+            lastSeen: u.lastSeen || u.createdAt,
+            createdAt: u.createdAt,
+            isFriend: uLower !== meLower && (friendListHas(me.friends, u.username) || friendListHas(u.friends, me.username)),
+            requestSent: uLower !== meLower && friendListHas(u.incomingRequests, me.username),
+            requestReceived: uLower !== meLower && friendListHas(me.incomingRequests, u.username)
+        };
+    });
     sendJSON(res, 200, { users: safe });
 }
 function handleUserSearch(req, res, query) {
