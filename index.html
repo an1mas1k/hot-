@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -1692,7 +1692,7 @@ button:hover,.btn:hover{border-color:rgba(255,213,74,.42)!important;box-shadow:0
             return h;
         }
         function apiGet(path) {
-            return fetch(API + path, { headers: apiHeaders() }).then(function (res) {
+            return fetch(API + path, { headers: apiHeaders(), cache: 'no-store' }).then(function (res) {
                 return res.json().then(function (json) {
                     if (!res.ok) throw new Error(json.error || 'Ошибка');
                     return json;
@@ -2406,9 +2406,17 @@ function renderPeople(q) {
                         btn.addEventListener('click', function (e) {
                             e.stopPropagation();
                             btn.disabled = true;
-                            apiPost('/api/friends/action', { target: btn.getAttribute('data-target'), action: 'send' }).then(function () {
-                                var uu = users.find(function (x) { return x.username === btn.getAttribute('data-target'); }); if (uu) uu.requestSent = true;
-btn.textContent = t('reqSent');
+                            apiPost('/api/friends/action', { target: btn.getAttribute('data-target'), action: 'send' }).then(function (result) {
+                                var targetName = btn.getAttribute('data-target');
+                                var uu = users.find(function (x) { return String(x.username).toLowerCase() === String(targetName).toLowerCase(); });
+                                if (uu) {
+                                    uu.isFriend = result.status === 'friends';
+                                    uu.requestSent = result.status === 'sent';
+                                    uu.requestReceived = result.status === 'received';
+                                }
+                                var searchInput = document.getElementById('people-search-input');
+                                renderPeople(searchInput ? searchInput.value : '');
+                                updateBadges();
                             }).catch(function (err) { btn.disabled = false; alert(err && err.message ? err.message : 'Ошибка'); });
                         });
                     });
