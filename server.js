@@ -19,6 +19,7 @@ const CHANNELS_FILE = path.join(DATA_DIR, 'channels.json');
 const CHATS_FILE = path.join(DATA_DIR, 'chats.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const RESET_FILE = path.join(DATA_DIR, 'password_resets.json');
+const HOT_AI_FILE = path.join(DATA_DIR, 'hot_ai_messages.json');
 const HTML_FILE = path.join(__dirname, 'index.html');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 try { fs.mkdirSync(UPLOAD_DIR, { recursive: true }); } catch (e) {}
@@ -63,6 +64,7 @@ function popCallSignals(user) {
 
 function ensureFile(filePath) { if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '[]', 'utf8'); }
 [USERS_FILE, POSTS_FILE, DM_FILE, FAVORITES_FILE, CHANNELS_FILE, CHATS_FILE, SESSIONS_FILE, RESET_FILE].forEach(ensureFile);
+ensureFile(HOT_AI_FILE);
 
 function readJSON(fp) {
     let raw = '';
@@ -1197,8 +1199,11 @@ async function handleUpdateProfile(req, res) {
         if (hasHandle && handle && !HANDLE_RE.test(handle)) return sendJSON(res, 400, { error: 'Юзернейм: 3-20 символов, латиница, цифры и _' });
         const processedAvatar = hasAvatar ? processImageInput(avatar, true) : null;
         if (hasAvatar && processedAvatar === null) return sendJSON(res, 400, { error: 'Аватар: разрешены PNG, JPG, WEBP или GIF до 5 МБ' });
-        const processedWallpaper = hasWallpaper ? processImageInput(wallpaper, true) : null;
-        if (hasWallpaper && processedWallpaper === null) return sendJSON(res, 400, { error: 'Обои: разрешены PNG, JPG, WEBP или GIF до 5 МБ' });
+        // Built-in Hot wallpaper presets are identifiers, not uploaded image files.
+        // Accept only the known preset IDs; uploaded image wallpapers still use normal validation.
+        const validWallpaperPreset = typeof wallpaper === 'string' && /^preset:(?:aurora|purple|sunset|ocean|forest|rose|midnight|graphite)$/.test(wallpaper);
+        const processedWallpaper = hasWallpaper ? (validWallpaperPreset ? wallpaper : processImageInput(wallpaper, true)) : null;
+        if (hasWallpaper && processedWallpaper === null) return sendJSON(res, 400, { error: 'Выбери готовые обои Hot или удали текущие обои' });
         if (hasBanner && typeof banner === 'string' && banner.length > MAX_BODY_SIZE) return sendJSON(res, 400, { error: 'Баннер слишком большой' });
         const processedBanner = hasBanner ? processImageInput(banner, true) : null;
         if (hasBanner && processedBanner === null) return sendJSON(res, 400, { error: 'Баннер: разрешены PNG, JPG, WEBP или GIF до 5 МБ' });
@@ -1562,9 +1567,13 @@ async function handleCommentDelete(req, res) {
 
 /* ========== CHANNELS ========== */
 
+function nameIn(list, name) { return Array.isArray(list) && list.some(x => String(x).toLowerCase() === String(name || '').toLowerCase()); }
+// Администратор канала/чата обязан быть участником; владелец сюда не входит
+function isChannelAdmin(c, username) { return !!username && nameIn(c.admins, username) && nameIn(c.members, username); }
+function isChatAdmin(c, username) { return !!username && nameIn(c.admins, username) && nameIn(c.members, username); }
 function channelPublic(c, viewer) {
     const isSub = viewer ? (c.members || []).some(m => m.toLowerCase() === viewer.toLowerCase()) : false;
-    return { id: c.id, username: c.username, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, createdAt: c.createdAt, members: Array.isArray(c.members) ? c.members.length : 0, memberNames: Array.isArray(c.members) ? c.members : [], isSubscribed: isSub, isOwner: !!(viewer && c.owner && String(c.owner).trim().toLowerCase() === String(viewer).trim().toLowerCase()), allowInvites: c.allowInvites !== false, writeMode: c.writeMode === 'members' ? 'members' : 'owner' };
+    return { id: c.id, username: c.username, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, createdAt: c.createdAt, members: Array.isArray(c.members) ? c.members.length : 0, memberNames: Array.isArray(c.members) ? c.members : [], admins: Array.isArray(c.admins) ? c.admins.filter(a => nameIn(c.members, a)) : [], isAdmin: viewer ? isChannelAdmin(c, viewer) : false, isSubscribed: isSub, isOwner: !!(viewer && c.owner && String(c.owner).trim().toLowerCase() === String(viewer).trim().toLowerCase()), allowInvites: c.allowInvites !== false, writeMode: c.writeMode === 'members' ? 'members' : 'owner' };
 }
 async function handleChannelCreate(req, res) {
     try {
@@ -1644,7 +1653,7 @@ async function handleChannelSubscribe(req, res) {
         const lowerUser = me.username.toLowerCase();
         const idx = ch.members.findIndex(m => m.toLowerCase() === lowerUser);
         let subscribed;
-        if (idx === -1) { ch.members.push(me.username); subscribed = true; } else { ch.members.splice(idx, 1); subscribed = false; }
+        if (idx === -1) { ch.members.push(me.username); subscribed = true; } else { ch.members.splice(idx, 1); subscribed = false; if (Array.isArray(ch.admins)) ch.admins = ch.admins.filter(a => String(a).toLowerCase() !== lowerUser); }
         saveChannels(channels);
         sendJSON(res, 200, { subscribed, memberCount: ch.members.length });
     } catch (e) { sendFail(res, e); }
@@ -1684,7 +1693,7 @@ async function handleChannelMessageCreate(req, res) {
         const channels = readChannels();
         const c = channels.find(x => x.username.toLowerCase() === normalizeHandle(data.channel || '').toLowerCase());
         if (!c) return sendJSON(res, 404, { error: 'Канал не найден' });
-        if (c.owner.toLowerCase() !== me.username.toLowerCase() && c.writeMode !== 'members') return sendJSON(res, 403, { error: 'Писать может только владелец' });
+        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !isChannelAdmin(c, me.username) && c.writeMode !== 'members') return sendJSON(res, 403, { error: 'Писать могут только владелец и администраторы канала' });
         if (c.owner.toLowerCase() !== me.username.toLowerCase() && !(c.members || []).some(m => m.toLowerCase() === me.username.toLowerCase())) return sendJSON(res, 403, { error: 'Сначала подпишись на канал' });
         let fileInfo = null;
         if (data.file && typeof data.file === 'object' && typeof data.file.data === 'string') {
@@ -1741,7 +1750,7 @@ async function handleChannelPin(req, res) {
         const channels = readChannels();
         const c = channels.find(x => x.username.toLowerCase() === channelUsername.toLowerCase());
         if (!c) return sendJSON(res, 404, { error: 'Канал не найден' });
-        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !['founder','admin'].includes(getStaffRole(me))) return sendJSON(res, 403, { error: 'Только создатель или администратор может закреплять' });
+        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !isChannelAdmin(c, me.username) && !['founder','admin'].includes(getStaffRole(me))) return sendJSON(res, 403, { error: 'Только создатель или администратор может закреплять' });
         if (pinned) {
             if (!messageId) return sendJSON(res, 400, { error: 'Не указано сообщение' });
             const msg = (c.messages || []).find(m => String(m.id) === String(messageId));
@@ -1754,6 +1763,28 @@ async function handleChannelPin(req, res) {
         }
         saveChannels(channels);
         sendJSON(res, 200, { ok: true, pinnedMessageId: c.pinnedMessageId });
+    } catch (e) { sendFail(res, e); }
+}
+async function handleChannelAdmin(req, res) {
+    try {
+        const me = authUser(req);
+        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const data = await readBody(req);
+        const channelUsername = normalizeHandle(data.channel || '');
+        const target = String(data.username || '').trim();
+        if (!channelUsername || !target) return sendJSON(res, 400, { error: 'Недостаточно данных' });
+        const channels = readChannels();
+        const c = channels.find(x => x.username.toLowerCase() === channelUsername.toLowerCase());
+        if (!c) return sendJSON(res, 404, { error: 'Канал не найден' });
+        if (String(c.owner || '').toLowerCase() !== me.username.toLowerCase()) return sendJSON(res, 403, { error: 'Только владелец может назначать администраторов' });
+        if (target.toLowerCase() === String(c.owner || '').toLowerCase()) return sendJSON(res, 400, { error: 'Владелец уже имеет все права' });
+        const memberName = (c.members || []).find(m => String(m).toLowerCase() === target.toLowerCase());
+        if (!memberName) return sendJSON(res, 404, { error: 'Этот человек не подписан на канал' });
+        if (!Array.isArray(c.admins)) c.admins = [];
+        c.admins = c.admins.filter(a => String(a).toLowerCase() !== target.toLowerCase());
+        if (data.admin !== false) c.admins.push(memberName);
+        saveChannels(channels);
+        sendJSON(res, 200, { ok: true, admins: c.admins });
     } catch (e) { sendFail(res, e); }
 }
 async function handleChannelMessageDelete(req, res) {
@@ -1770,7 +1801,10 @@ async function handleChannelMessageDelete(req, res) {
         const msg = (c.messages || []).find(m => m.id === messageId);
         if (!msg) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
         const isAuthor = (msg.author && String(msg.author).toLowerCase() === me.username.toLowerCase()) || (!msg.author && c.owner && String(c.owner).toLowerCase() === me.username.toLowerCase() && String(msg.from||'').toLowerCase() === String(c.name||'').toLowerCase());
-        if (!isAuthor) return sendJSON(res, 403, { error: 'Можно удалять только свои сообщения' });
+        const chOwnerLower = String(c.owner || '').toLowerCase();
+        const targetAuthor = String(msg.author || (String(msg.from || '').toLowerCase() === String(c.name || '').toLowerCase() ? c.owner : '') || '').toLowerCase();
+        const canDelete = isAuthor || chOwnerLower === me.username.toLowerCase() || (isChannelAdmin(c, me.username) && targetAuthor !== chOwnerLower);
+        if (!canDelete) return sendJSON(res, 403, { error: 'Нет прав на удаление этого сообщения' });
         const before = (c.messages || []).length;
         c.messages = (c.messages || []).filter(m => m.id !== messageId);
         if (c.messages.length === before) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
@@ -1795,11 +1829,11 @@ async function handleChatCreate(req, res) {
         members = members.map(function (name) { const u = allUsers.find(x => x.username.toLowerCase() === name.toLowerCase() && !x.system); return u ? u.username : null; }).filter(Boolean);
         if (!members.some(x => x.toLowerCase() === me.username.toLowerCase())) members.unshift(me.username);
         members = Array.from(new Map(members.map(x => [x.toLowerCase(), x])).values()).slice(0, 100);
-        const chat = { id: makeId(), name, description: (data.description || '').trim(), avatar: processImageInput(typeof data.avatar === 'string' ? data.avatar : '', true), allowInvites: true, allowMembersWrite: true, owner: me.username, members, messages: [], pinnedMessageId: null, createdAt: new Date().toISOString() };
+        const chat = { id: makeId(), name, description: (data.description || '').trim(), avatar: processImageInput(typeof data.avatar === 'string' ? data.avatar : '', true), allowInvites: true, allowMembersWrite: true, owner: me.username, admins: [], members, messages: [], pinnedMessageId: null, createdAt: new Date().toISOString() };
         const chats = readChats();
         chats.push(chat);
         saveChats(chats);
-        sendJSON(res, 201, { chat: { id: chat.id, name: chat.name, owner: chat.owner, members: chat.members, memberCount: chat.members.length } });
+        sendJSON(res, 201, { chat: { id: chat.id, name: chat.name, owner: chat.owner, admins: [], members: chat.members, memberCount: chat.members.length } });
     } catch (e) { sendFail(res, e); }
 }
 function handleChatsGet(req, res, query) {
@@ -1814,7 +1848,7 @@ function handleChatsGet(req, res, query) {
             if (!Array.isArray(m.read)) return;
             if (!m.read.some(u => u.toLowerCase() === user)) unread++;
         });
-        return { id: c.id, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, members: c.members, memberCount: c.members.length, lastText: last ? last.text : '', lastAt: last ? last.createdAt : c.createdAt, unread };
+        return { id: c.id, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, admins: Array.isArray(c.admins) ? c.admins : [], members: c.members, memberCount: c.members.length, lastText: last ? last.text : '', lastAt: last ? last.createdAt : c.createdAt, unread };
     });
     sendJSON(res, 200, { chats: list });
 }
@@ -1841,7 +1875,7 @@ async function handleChatUpdate(req, res) {
         if (typeof data.allowInvites === 'boolean') c.allowInvites = data.allowInvites;
         if (typeof data.allowMembersWrite === 'boolean') c.allowMembersWrite = data.allowMembersWrite;
         saveChats(chats);
-        sendJSON(res, 200, { chat: { id:c.id, name:c.name, description:c.description || '', avatar:c.avatar || '', owner:c.owner, members:c.members, memberCount:c.members.length, allowInvites:c.allowInvites !== false, allowMembersWrite:c.allowMembersWrite !== false } });
+        sendJSON(res, 200, { chat: { id:c.id, name:c.name, description:c.description || '', avatar:c.avatar || '', owner:c.owner, admins:Array.isArray(c.admins)?c.admins:[], members:c.members, memberCount:c.members.length, allowInvites:c.allowInvites !== false, allowMembersWrite:c.allowMembersWrite !== false } });
     } catch (e) { sendFail(res, e); }
 }
 async function handleChatDelete(req, res) {
@@ -1875,7 +1909,7 @@ function handleChatMessagesGet(req, res, query) {
     });
     if (changed) saveChats(chats);
     sendJSON(res, 200, {
-        chat: { id: chat.id, name: chat.name, description: chat.description || '', avatar: chat.avatar || '', memberCount: chat.members.length, members: chat.members, owner: chat.owner, allowInvites: chat.allowInvites !== false, allowMembersWrite: chat.allowMembersWrite !== false, pinnedMessageId: chat.pinnedMessageId || null },
+        chat: { id: chat.id, name: chat.name, description: chat.description || '', avatar: chat.avatar || '', memberCount: chat.members.length, members: chat.members, admins: Array.isArray(chat.admins) ? chat.admins : [], owner: chat.owner, allowInvites: chat.allowInvites !== false, allowMembersWrite: chat.allowMembersWrite !== false, pinnedMessageId: chat.pinnedMessageId || null },
         messages: (chat.messages || []).slice(-300).map(function(m){ const u=(chatUsers||(chatUsers=readUsers())).find(function(x){return String(x.username||'').toLowerCase()===String(m.from||'').toLowerCase();}); return Object.assign({},m,{fromDisplay:u?adminDisplayName(u):m.from}); })
     });
 }
@@ -1891,7 +1925,7 @@ async function handleChatMessageCreate(req, res) {
         const c = chats.find(x => x.id === data.id);
         if (!c) return sendJSON(res, 404, { error: 'Чат не найден' });
         if (!(c.members || []).some(m => m.toLowerCase() === me.username.toLowerCase())) return sendJSON(res, 403, { error: 'Нет доступа к этому чату' });
-        if (c.owner.toLowerCase() !== me.username.toLowerCase() && c.allowMembersWrite === false) return sendJSON(res, 403, { error: 'Писать в этот чат может только создатель' });
+        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !isChatAdmin(c, me.username) && c.allowMembersWrite === false) return sendJSON(res, 403, { error: 'Писать в этот чат могут только создатель и администраторы' });
         const text = (data.text || '').trim();
         if (text.length > 5000) return sendJSON(res, 400, { error: 'Сообщение: максимум 5000 символов' });
         let fileInfo = null;
@@ -1924,7 +1958,7 @@ async function handleChatPin(req, res) {
         const chats = readChats();
         const c = chats.find(x => x.id === chatId);
         if (!c) return sendJSON(res, 404, { error: 'Чат не найден' });
-        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !['founder','admin'].includes(getStaffRole(me))) return sendJSON(res, 403, { error: 'Только создатель или администратор может закреплять' });
+        if (c.owner.toLowerCase() !== me.username.toLowerCase() && !isChatAdmin(c, me.username) && !['founder','admin'].includes(getStaffRole(me))) return sendJSON(res, 403, { error: 'Только создатель или администратор может закреплять' });
         if (pinned) {
             if (!messageId) return sendJSON(res, 400, { error: 'Не указано сообщение' });
             const msg = (c.messages || []).find(m => String(m.id) === String(messageId));
@@ -1937,6 +1971,28 @@ async function handleChatPin(req, res) {
         }
         saveChats(chats);
         sendJSON(res, 200, { ok: true, pinnedMessageId: c.pinnedMessageId });
+    } catch (e) { sendFail(res, e); }
+}
+async function handleChatAdmin(req, res) {
+    try {
+        const me = authUser(req);
+        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const data = await readBody(req);
+        const chatId = String(data.chatId || '').trim();
+        const target = String(data.username || '').trim();
+        if (!chatId || !target) return sendJSON(res, 400, { error: 'Недостаточно данных' });
+        const chats = readChats();
+        const c = chats.find(x => x.id === chatId);
+        if (!c) return sendJSON(res, 404, { error: 'Чат не найден' });
+        if (String(c.owner || '').toLowerCase() !== me.username.toLowerCase()) return sendJSON(res, 403, { error: 'Только владелец может назначать администраторов' });
+        if (target.toLowerCase() === String(c.owner || '').toLowerCase()) return sendJSON(res, 400, { error: 'Владелец уже имеет все права' });
+        const memberName = (c.members || []).find(m => String(m).toLowerCase() === target.toLowerCase());
+        if (!memberName) return sendJSON(res, 404, { error: 'Этого человека нет в чате' });
+        if (!Array.isArray(c.admins)) c.admins = [];
+        c.admins = c.admins.filter(a => String(a).toLowerCase() !== target.toLowerCase());
+        if (data.admin !== false) c.admins.push(memberName);
+        saveChats(chats);
+        sendJSON(res, 200, { ok: true, admins: c.admins });
     } catch (e) { sendFail(res, e); }
 }
 async function handleChatMessageDelete(req, res) {
@@ -1953,7 +2009,9 @@ async function handleChatMessageDelete(req, res) {
         const msg = (c.messages || []).find(m => m.id === messageId);
         if (!msg) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
         const isAuthor = msg.from && msg.from.toLowerCase() === me.username.toLowerCase();
-        if (!isAuthor) return sendJSON(res, 403, { error: 'Можно удалять только свои сообщения' });
+        const chatOwnerLower = String(c.owner || '').toLowerCase();
+        const canDelete = isAuthor || chatOwnerLower === me.username.toLowerCase() || (isChatAdmin(c, me.username) && String(msg.from || '').toLowerCase() !== chatOwnerLower);
+        if (!canDelete) return sendJSON(res, 403, { error: 'Нет прав на удаление этого сообщения' });
         c.messages = (c.messages || []).filter(m => m.id !== messageId);
         if (c.pinnedMessageId === messageId) c.pinnedMessageId = null;
         saveChats(chats);
@@ -2226,6 +2284,84 @@ function handleCommunicationUnreadCount(req, res, query) {
     sendJSON(res, 200, { count });
 }
 
+/* ========== HOT AI ========== */
+function readHotAI() {
+    const value = readJSON(HOT_AI_FILE);
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+function saveHotAI(value) { writeJSON(HOT_AI_FILE, value); }
+function geminiRequest(body) {
+    return new Promise(function (resolve, reject) {
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) return reject(new Error('На сервере не задан GEMINI_API_KEY. Создай бесплатный ключ Google AI Studio и добавь его в переменные окружения.'));
+        const raw = JSON.stringify(body);
+        const model = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+        const req = https.request({
+            hostname: 'generativelanguage.googleapis.com',
+            path: '/v1beta/models/' + encodeURIComponent(model) + ':generateContent?key=' + encodeURIComponent(apiKey),
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(raw) }
+        }, function (response) {
+            let data = '';
+            response.setEncoding('utf8');
+            response.on('data', function (chunk) { if (data.length < 200000) data += chunk; });
+            response.on('end', function () {
+                let json = {};
+                try { json = JSON.parse(data || '{}'); } catch (e) {}
+                if (response.statusCode < 200 || response.statusCode >= 300) {
+                    const msg = json && json.error && json.error.message;
+                    return reject(new Error(msg || ('Gemini API: HTTP ' + response.statusCode)));
+                }
+                const answer = (((json.candidates || [])[0] || {}).content || {}).parts || [];
+                const text = answer.map(function (part) { return part.text || ''; }).join('').trim();
+                if (!text) return reject(new Error('ИИ не вернул текст. Попробуй ещё раз.'));
+                resolve(text);
+            });
+        });
+        req.setTimeout(45000, function () { req.destroy(new Error('ИИ долго не отвечает. Попробуй ещё раз.')); });
+        req.on('error', reject); req.write(raw); req.end();
+    });
+}
+function handleHotAIMessages(req, res) {
+    const me = authUser(req);
+    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    const store = readHotAI();
+    sendJSON(res, 200, { messages: Array.isArray(store[me.username.toLowerCase()]) ? store[me.username.toLowerCase()] : [] });
+}
+async function handleHotAISend(req, res) {
+    const me = authUser(req);
+    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    try {
+        const data = await readBody(req);
+        const text = String(data.text || '').trim();
+        if (!text) return sendJSON(res, 400, { error: 'Напиши сообщение для HOT AI' });
+        if (text.length > 6000) return sendJSON(res, 400, { error: 'Сообщение слишком длинное (максимум 6000 символов)' });
+        const store = readHotAI();
+        const key = me.username.toLowerCase();
+        const messages = Array.isArray(store[key]) ? store[key] : [];
+        const history = messages.slice(-20).map(function (m) { return { role: m.role, content: m.text }; });
+        history.push({ role: 'user', content: text });
+        const contents = history.map(function (m) {
+            return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: String(m.content || '') }] };
+        });
+        const answer = await geminiRequest({
+            systemInstruction: { parts: [{ text: 'Ты HOT AI — дружелюбный виртуальный помощник внутри социальной сети Hot. Отвечай на языке пользователя, обычно по-русски. Пиши понятно и полезно. Не ограничивай себя темой программирования: помогай с обычными вопросами, идеями, учёбой и повседневными задачами. Не утверждай, что можешь выполнять действия в социальной сети или на компьютере, если у тебя нет такого инструмента.' }] },
+            contents: contents,
+            generationConfig: { maxOutputTokens: 900, temperature: 0.7 }
+        });
+        const now = new Date().toISOString();
+        messages.push({ id: crypto.randomBytes(12).toString('hex'), role: 'user', text: text, createdAt: now });
+        messages.push({ id: crypto.randomBytes(12).toString('hex'), role: 'assistant', text: answer, createdAt: new Date().toISOString() });
+        store[key] = messages.slice(-100);
+        saveHotAI(store);
+        sendJSON(res, 200, { answer: answer, messages: store[key] });
+    } catch (e) {
+        console.error('HOT AI error:', e.message);
+        const message = /GEMINI_API_KEY/.test(e.message) ? e.message : (/API_KEY_INVALID|invalid API key|HTTP 401|HTTP 403/i.test(e.message) ? 'Google Gemini не принял API-ключ. Проверь GEMINI_API_KEY.' : (/quota|rate limit|RESOURCE_EXHAUSTED|billing/i.test(e.message) ? 'Бесплатный лимит Gemini временно исчерпан. Подожди сброса лимита и попробуй снова.' : 'Gemini API: ' + e.message));
+        sendJSON(res, 502, { error: message });
+    }
+}
+
 /* ========== SERVER ========== */
 
 process.on('uncaughtException', function (e) { console.error('Необработанная ошибка (сервер продолжает работу):', e); });
@@ -2253,6 +2389,8 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/password-reset/confirm' && req.method === 'POST') return handlePasswordResetConfirm(req, res);
     if (url === '/api/logout' && req.method === 'POST') return handleLogout(req, res);
     if (url === '/api/auth/session' && req.method === 'GET') return handleSession(req, res);
+    if (url === '/api/hot-ai/messages' && req.method === 'GET') return handleHotAIMessages(req, res);
+    if (url === '/api/hot-ai/send' && req.method === 'POST') return handleHotAISend(req, res);
     if ((url === '/api/admin/panel' || url === '/api/admin/users') && req.method === 'GET') return handleAdminPanel(req, res);
     if (url === '/api/admin/action' && req.method === 'POST') return handleAdminAction(req, res);
 
@@ -2285,6 +2423,7 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/channels/message/reaction' && req.method === 'POST') return handleChannelMessageReaction(req, res);
     if (url === '/api/channels/message/delete' && req.method === 'POST') return handleChannelMessageDelete(req, res);
     if (url === '/api/channels/pin' && req.method === 'POST') return handleChannelPin(req, res);
+    if (url === '/api/channels/admin' && req.method === 'POST') return handleChannelAdmin(req, res);
 
     if (url === '/api/chats' && req.method === 'GET') return handleChatsGet(req, res, query);
     if (url === '/api/chats' && req.method === 'POST') return handleChatCreate(req, res);
@@ -2294,6 +2433,7 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/chats/message' && req.method === 'POST') return handleChatMessageCreate(req, res);
     if (url === '/api/chats/message/delete' && req.method === 'POST') return handleChatMessageDelete(req, res);
     if (url === '/api/chats/pin' && req.method === 'POST') return handleChatPin(req, res);
+    if (url === '/api/chats/admin' && req.method === 'POST') return handleChatAdmin(req, res);
 
     if (url === '/api/posts/feed' && req.method === 'GET') return handleFeedGet(req, res, query);
     if (url === '/api/posts' && req.method === 'GET') return handlePostsGet(req, res, query);
