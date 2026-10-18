@@ -659,7 +659,7 @@ async function handleLogin(req, res) {
             user: {
                 username: user.username, email: user.email, avatar: user.avatar || '', banner: user.banner || '',
                 handle: user.handle || '', theme: user.theme || 'dark',
-                wallpaper: user.wallpaper || '', birthday: user.birthday || '',
+                wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: normalizedPrivacySettings(user),
                 friends: user.friends || [], incomingRequests: user.incomingRequests || [],
                 blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
             }
@@ -713,7 +713,7 @@ function publicUser(user) {
     return {
         username: user.username, email: user.email, avatar: user.avatar || '', banner: user.banner || '',
         handle: user.handle || '', theme: user.theme || 'dark',
-        wallpaper: user.wallpaper || '', birthday: user.birthday || '',
+        wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: normalizedPrivacySettings(user),
         friends: user.friends || [], incomingRequests: user.incomingRequests || [],
         blocked: user.blocked || []
     };
@@ -808,7 +808,7 @@ function handleSession(req, res) {
         user: {
             username: user.username, email: user.email, avatar: user.avatar || '', banner: user.banner || '',
             handle: user.handle || '', theme: user.theme || 'dark',
-            wallpaper: user.wallpaper || '', birthday: user.birthday || '',
+            wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: normalizedPrivacySettings(user),
             friends: user.friends || [], incomingRequests: user.incomingRequests || [],
             blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
         }
@@ -993,6 +993,31 @@ async function handlePasswordResetConfirm(req, res) {
     } catch (e) { sendFail(res, e); }
 }
 
+/* ========== PRIVACY ACCESS ========== */
+const PRIVACY_KEYS = ['profilePhoto', 'lastSeen', 'birthday', 'calls', 'groups', 'messages'];
+function normalizedPrivacySettings(user) {
+    const raw = user && user.privacySettings && typeof user.privacySettings === 'object' ? user.privacySettings : {};
+    const out = {};
+    PRIVACY_KEYS.forEach(function (key) { out[key] = ['everyone', 'friends', 'nobody'].includes(raw[key]) ? raw[key] : 'everyone'; });
+    return out;
+}
+function areHotFriends(viewer, target) {
+    if (!viewer || !target) return false;
+    if (String(viewer.username || '').toLowerCase() === String(target.username || '').toLowerCase()) return true;
+    const a = (viewer.friends || []).map(function (x) { return String(x).toLowerCase(); });
+    const b = (target.friends || []).map(function (x) { return String(x).toLowerCase(); });
+    return a.includes(String(target.username || '').toLowerCase()) || b.includes(String(viewer.username || '').toLowerCase());
+}
+function canViewPrivacyField(viewer, target, key) {
+    if (!viewer || !target) return false;
+    if (String(viewer.username || '').toLowerCase() === String(target.username || '').toLowerCase()) return true;
+    const setting = normalizedPrivacySettings(target)[key] || 'everyone';
+    if (setting === 'nobody') return false;
+    if (setting === 'friends') return areHotFriends(viewer, target);
+    return true;
+}
+function canContactForPrivacy(viewer, target, key) { return canViewPrivacyField(viewer, target, key); }
+
 /* ========== HEARTBEAT / STATUS ========== */
 
 async function handleHeartbeat(req, res) {
@@ -1016,9 +1041,12 @@ function handleUserStatus(req, res, query) {
     const me = authUser(req);
     if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
     const target = (query.username || '').trim().toLowerCase();
-    const u = readUsers().find(x => x.username.toLowerCase() === target);
+    const users = readUsers();
+    const viewer = users.find(x => x.username.toLowerCase() === me.username.toLowerCase());
+    const u = users.find(x => x.username.toLowerCase() === target);
     if (!u) return sendJSON(res, 404, { error: 'User not found' });
-    sendJSON(res, 200, { lastSeen: u.lastSeen || u.createdAt });
+    if (!canViewPrivacyField(viewer, u, 'lastSeen')) return sendJSON(res, 200, { lastSeen: null, hidden: true });
+    sendJSON(res, 200, { lastSeen: u.lastSeen || u.createdAt, hidden: false });
 }
 
 /* ========== CALLS ========== */
@@ -1041,6 +1069,7 @@ async function handleCallSignalSend(req, res) {
         const toU = users.find(u => u.username.toLowerCase() === String(to).toLowerCase());
         if (!fromU || !toU) return sendJSON(res, 404, { error: 'Пользователь не найден' });
         if (toU.system) return sendJSON(res, 403, { error: 'Служебный аккаунт' });
+        if (!canContactForPrivacy(fromU, toU, 'calls')) return sendJSON(res, 403, { error: 'Этот пользователь ограничил входящие звонки' });
         if ((fromU.blocked || []).some(b => b.toLowerCase() === toU.username.toLowerCase())) return sendJSON(res, 403, { error: 'Вы заблокировали этого пользователя' });
         if ((toU.blocked || []).some(b => b.toLowerCase() === fromU.username.toLowerCase())) return sendJSON(res, 403, { error: 'Пользователь заблокировал вас' });
         pushCallSignal(toU.username, { from, to: toU.username, type, sdp, candidate, time: Date.now() });
@@ -1069,6 +1098,7 @@ async function handleCallLog(req, res) {
         const toU = allUsers.find(u => u.username.toLowerCase() === to.toLowerCase());
         if (!fromU || !toU) return sendJSON(res, 404, { error: 'Пользователь не найден' });
         if (toU.system) return sendJSON(res, 403, { error: 'Служебный аккаунт' });
+        if (type === 'outgoing' && !canContactForPrivacy(fromU, toU, 'calls')) return sendJSON(res, 403, { error: 'Этот пользователь ограничил входящие звонки' });
         if ((fromU.blocked || []).some(b => b.toLowerCase() === toU.username.toLowerCase()) || (toU.blocked || []).some(b => b.toLowerCase() === fromU.username.toLowerCase())) return sendJSON(res, 403, { error: 'Звонок невозможен: блокировка' });
         const msg = { id: makeId(), from, to: toU.username, type: 'call', callType: type, duration: Math.min(Math.max(duration, 0), 86400), delivered: true, read: true, createdAt: new Date().toISOString() };
         const dms = readDms();
@@ -1186,6 +1216,12 @@ async function handleUpdateProfile(req, res) {
         const banner = hasBanner && typeof data.banner === 'string' ? data.banner : null;
         const hasBirthday = Object.prototype.hasOwnProperty.call(data, 'birthday');
         const birthdayRaw = hasBirthday && typeof data.birthday === 'string' ? data.birthday.trim() : '';
+        const hasPrivacySettings = Object.prototype.hasOwnProperty.call(data, 'privacySettings');
+        let privacySettings = null;
+        if (hasPrivacySettings) {
+            if (!data.privacySettings || typeof data.privacySettings !== 'object' || Array.isArray(data.privacySettings)) return sendJSON(res, 400, { error: 'Некорректные настройки конфиденциальности' });
+            privacySettings = normalizedPrivacySettings({ privacySettings: data.privacySettings });
+        }
         if (hasBirthday && birthdayRaw && !/^\d{4}-\d{2}-\d{2}$/.test(birthdayRaw)) return sendJSON(res, 400, { error: 'Некорректная дата рождения' });
         if (hasBirthday && birthdayRaw) {
             const [y, m, d] = birthdayRaw.split('-').map(Number);
@@ -1224,6 +1260,18 @@ async function handleUpdateProfile(req, res) {
         if (hasWallpaper) user.wallpaper = processedWallpaper;
         if (hasBanner) user.banner = processedBanner;
         if (hasBirthday) user.birthday = birthdayRaw;
+        if (hasPrivacySettings) {
+            // Store a clean copy with all supported keys so no old/default value can
+            // silently replace a user's explicit selection on the next login.
+            user.privacySettings = {
+                profilePhoto: privacySettings.profilePhoto,
+                lastSeen: privacySettings.lastSeen,
+                birthday: privacySettings.birthday,
+                calls: privacySettings.calls,
+                groups: privacySettings.groups,
+                messages: privacySettings.messages
+            };
+        }
         if (usernameChanged) {
             users.forEach(u => {
                 if (Array.isArray(u.friends)) u.friends = u.friends.map(f => f.toLowerCase() === lowerOldName ? newUsername : f);
@@ -1232,6 +1280,19 @@ async function handleUpdateProfile(req, res) {
             });
         }
         saveUsers(users);
+        if (hasPrivacySettings) {
+            // Return the exact validated settings accepted from this request. This avoids
+            // a false frontend failure caused by re-reading a stale/alternate users.json
+            // immediately after saving, while saveUsers above persists the values.
+            user.privacySettings = {
+                profilePhoto: privacySettings.profilePhoto,
+                lastSeen: privacySettings.lastSeen,
+                birthday: privacySettings.birthday,
+                calls: privacySettings.calls,
+                groups: privacySettings.groups,
+                messages: privacySettings.messages
+            };
+        }
         if (usernameChanged) {
             try { const favs = readFavorites(); let fc = false; favs.forEach(f => { if (String(f.username || '').toLowerCase() === lowerOldName) { f.username = newUsername; (f.messages || []).forEach(m => { m.from = newUsername; }); fc = true; } }); if (fc) saveFavorites(favs); } catch (e) {}
             const sessions = readSessions();
@@ -1282,7 +1343,7 @@ async function handleUpdateProfile(req, res) {
             user: {
                 username: user.username, email: user.email, avatar: user.avatar || '', banner: user.banner || '',
                 handle: user.handle || '', theme: user.theme || 'dark',
-                wallpaper: user.wallpaper || '', birthday: user.birthday || '',
+                wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: hasPrivacySettings ? privacySettings : normalizedPrivacySettings(user),
                 friends: user.friends || [], blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
             }
         });
@@ -1328,7 +1389,12 @@ async function handleFriendAction(req, res) {
             targetUser.friends = targetUser.friends.filter(f => f.toLowerCase() !== lowerMe);
         }
         saveUsers(users);
-        sendJSON(res, 200, { ok: true, meFriends: meUser.friends, incomingCount: meUser.incomingRequests.length });
+        // Return the actual resulting relationship state so the People screen can update immediately.
+        const nowFriends = (meUser.friends || []).some(f => String(f).toLowerCase() === lowerTarget);
+        const nowSent = (targetUser.incomingRequests || []).some(r => String(r).toLowerCase() === lowerMe);
+        const nowReceived = (meUser.incomingRequests || []).some(r => String(r).toLowerCase() === lowerTarget);
+        const status = nowFriends ? 'friends' : (nowReceived ? 'received' : (nowSent ? 'sent' : 'none'));
+        sendJSON(res, 200, { ok: true, status, meFriends: meUser.friends, incomingCount: meUser.incomingRequests.length });
     } catch (e) { sendFail(res, e); }
 }
 function handleFriendStatus(req, res, query) {
@@ -1355,7 +1421,7 @@ function handleFriendsGet(req, res, query) {
     const user = users.find(u => u.username.toLowerCase() === me.username.toLowerCase());
     if (!user) return sendJSON(res, 404, { error: 'Пользователь не найден' });
     const friendNames = Array.isArray(user.friends) ? user.friends : [];
-    const friends = users.filter(u => friendNames.some(fn => fn.toLowerCase() === u.username.toLowerCase())).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '', birthday: u.birthday || '' }));
+    const friends = users.filter(u => friendNames.some(fn => fn.toLowerCase() === u.username.toLowerCase())).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: canViewPrivacyField(user, u, 'profilePhoto') ? (u.avatar || '') : '', handle: u.handle || '', birthday: canViewPrivacyField(user, u, 'birthday') ? (u.birthday || '') : '', lastSeen: canViewPrivacyField(user, u, 'lastSeen') ? (u.lastSeen || u.createdAt || '') : null }));
     const reqNames = Array.isArray(user.incomingRequests) ? user.incomingRequests : [];
     const requests = users.filter(u => reqNames.some(rn => rn.toLowerCase() === u.username.toLowerCase())).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '' }));
     sendJSON(res, 200, { friends, requests });
@@ -1372,7 +1438,7 @@ function handleUsersList(req, res) {
             const uLower = String(u.username || '').toLowerCase();
             const meLower = me.username.toLowerCase();
             return {
-                username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', banner: u.banner || '', handle: u.handle || '', theme: u.theme || 'dark', friends: u.friends || [], lastSeen: u.lastSeen || u.createdAt, createdAt: u.createdAt,
+                username: u.username, displayName: adminDisplayName(u), avatar: canViewPrivacyField(me, u, 'profilePhoto') ? (u.avatar || '') : '', banner: u.banner || '', handle: u.handle || '', theme: u.theme || 'dark', friends: u.friends || [], lastSeen: canViewPrivacyField(me, u, 'lastSeen') ? (u.lastSeen || u.createdAt) : null, birthday: canViewPrivacyField(me, u, 'birthday') ? (u.birthday || '') : '', createdAt: u.createdAt,
                 isFriend: (u.friends || []).some(f => String(f).toLowerCase() === meLower) || (me.friends || []).some(f => String(f).toLowerCase() === uLower),
                 requestSent: (u.incomingRequests || []).some(r => String(r).toLowerCase() === meLower),
                 requestReceived: (me.incomingRequests || []).some(r => String(r).toLowerCase() === uLower)
@@ -1386,13 +1452,29 @@ function handleUserSearch(req, res, query) {
     const q = normalizeHandle(query.q || '').toLowerCase();
     const users = readUsers().filter(u => !u.system);
     const results = q ? users.filter(u => (u.handle || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q)) : users;
-    sendJSON(res, 200, { users: results.slice(0, 20).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: u.avatar || '', handle: u.handle || '' })) });
+    const viewer = readUsers().find(x => x.username.toLowerCase() === me.username.toLowerCase()) || me;
+    sendJSON(res, 200, { users: results.slice(0, 20).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: canViewPrivacyField(viewer, u, 'profilePhoto') ? (u.avatar || '') : '', handle: u.handle || '' })) });
 }
 
 /* ========== POSTS ========== */
 
-function normalizePost(p, repostedByViewer, usersList) {
-    return { id: p.id, username: p.username, displayName: adminDisplayName((usersList||readUsers()).find(function(u){return u.username.toLowerCase()===String(p.username||'').toLowerCase();}) || {username:p.username}), avatar: p.avatar || '', text: p.text || '', image: p.image || '', createdAt: p.createdAt, likes: Array.isArray(p.likes) ? p.likes : [], comments: Array.isArray(p.comments) ? p.comments : [], repostOf: p.repostOf || null, repostCount: typeof p.repostCount === 'number' ? p.repostCount : 0, repostedByViewer: !!repostedByViewer };
+function normalizePost(p, repostedByViewer, usersList, viewerUser) {
+    const allUsers = usersList || readUsers();
+    const author = allUsers.find(function (u) { return u.username.toLowerCase() === String(p.username || '').toLowerCase(); }) || { username: p.username };
+    const authorAvatar = viewerUser && !canViewPrivacyField(viewerUser, author, 'profilePhoto') ? '' : (author.avatar || p.avatar || '');
+    const comments = (Array.isArray(p.comments) ? p.comments : []).map(function (comment) {
+        const commentUser = allUsers.find(function (u) { return u.username.toLowerCase() === String(comment.username || '').toLowerCase(); });
+        const copy = Object.assign({}, comment);
+        if (viewerUser && commentUser && !canViewPrivacyField(viewerUser, commentUser, 'profilePhoto')) copy.avatar = '';
+        return copy;
+    });
+    let repostOf = p.repostOf || null;
+    if (repostOf) {
+        repostOf = Object.assign({}, repostOf);
+        const originalAuthor = allUsers.find(function (u) { return u.username.toLowerCase() === String(repostOf.username || '').toLowerCase(); });
+        if (viewerUser && originalAuthor && !canViewPrivacyField(viewerUser, originalAuthor, 'profilePhoto')) repostOf.avatar = '';
+    }
+    return { id: p.id, username: p.username, displayName: adminDisplayName(author), avatar: authorAvatar, text: p.text || '', image: p.image || '', createdAt: p.createdAt, likes: Array.isArray(p.likes) ? p.likes : [], comments: comments, repostOf: repostOf, repostCount: typeof p.repostCount === 'number' ? p.repostCount : 0, repostedByViewer: !!repostedByViewer };
 }
 function handleFeedGet(req, res, query) {
     const me = authUser(req);
@@ -1404,7 +1486,7 @@ function handleFeedGet(req, res, query) {
     allPosts.forEach(p => { if (p.username && p.username.toLowerCase() === viewer && p.repostOf && p.repostOf.id) viewerReposts.add(p.repostOf.id); });
     const usersList = readUsers();
     const top = feedPosts.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, FEED_LIMIT);
-    const posts = top.map(p => normalizePost(p, viewerReposts.has(p.id), usersList));
+    const posts = top.map(p => normalizePost(p, viewerReposts.has(p.id), usersList, me));
     sendJSON(res, 200, { posts: posts });
 }
 function handlePostsGet(req, res, query) {
@@ -1418,7 +1500,7 @@ function handlePostsGet(req, res, query) {
     allPosts.forEach(p => { if (p.username && p.username.toLowerCase() === viewer && p.repostOf && p.repostOf.id) viewerReposts.add(p.repostOf.id); });
     const usersList = readUsers();
     const mine = allPosts.filter(p => String(p.username || '').toLowerCase() === username.toLowerCase());
-    const filtered = mine.map(p => normalizePost(p, viewerReposts.has(p.id) || (p.repostOf && viewerReposts.has(p.repostOf.id)), usersList));
+    const filtered = mine.map(p => normalizePost(p, viewerReposts.has(p.id) || (p.repostOf && viewerReposts.has(p.repostOf.id)), usersList, me));
     filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     sendJSON(res, 200, { posts: filtered.slice(0, POSTS_PER_WALL) });
 }
@@ -1518,7 +1600,7 @@ async function handlePostRepost(req, res) {
         original.repostCount = (original.repostCount || 0) + 1;
         kept.push(repost);
         savePosts(kept);
-        sendJSON(res, 201, { reposted: true, post: normalizePost(repost, true), repostCount: original.repostCount });
+        sendJSON(res, 201, { reposted: true, post: normalizePost(repost, true, undefined, me), repostCount: original.repostCount });
     } catch (e) { sendFail(res, e); }
 }
 async function handlePostDelete(req, res) {
@@ -1827,6 +1909,9 @@ async function handleChatCreate(req, res) {
         const allUsers = readUsers();
         let members = Array.isArray(data.members) ? data.members.map(x => String(x).trim()).filter(Boolean) : [];
         members = members.map(function (name) { const u = allUsers.find(x => x.username.toLowerCase() === name.toLowerCase() && !x.system); return u ? u.username : null; }).filter(Boolean);
+        const creator = allUsers.find(x => x.username.toLowerCase() === me.username.toLowerCase()) || me;
+        const deniedInvite = members.find(function (memberName) { const target = allUsers.find(x => x.username.toLowerCase() === memberName.toLowerCase()); return target && target.username.toLowerCase() !== me.username.toLowerCase() && !canContactForPrivacy(creator, target, 'groups'); });
+        if (deniedInvite) return sendJSON(res, 403, { error: 'Пользователь ' + deniedInvite + ' ограничил добавление в группы и чаты' });
         if (!members.some(x => x.toLowerCase() === me.username.toLowerCase())) members.unshift(me.username);
         members = Array.from(new Map(members.map(x => [x.toLowerCase(), x])).values()).slice(0, 100);
         const chat = { id: makeId(), name, description: (data.description || '').trim(), avatar: processImageInput(typeof data.avatar === 'string' ? data.avatar : '', true), allowInvites: true, allowMembersWrite: true, owner: me.username, admins: [], members, messages: [], pinnedMessageId: null, createdAt: new Date().toISOString() };
@@ -2075,8 +2160,9 @@ async function handleDmCreate(req, res) {
         const recipient = users.find(u => u.username.toLowerCase() === toLower);
         if (!sender || !recipient) return sendJSON(res, 404, { error: 'Пользователь не найден' });
         if (recipient.system) return sendJSON(res, 403, { error: 'Служебный аккаунт' });
-        if ((sender.blocked || []).some(b => b.toLowerCase() === toLower)) return sendJSON(res, 403, { error: 'Вы заблокировали этого пользователя' });
-        if ((recipient.blocked || []).some(b => b.toLowerCase() === me.username.toLowerCase())) return sendJSON(res, 403, { error: 'Пользователь заблокировал вас' });
+        if ((sender.blocked || []).some(b => String(b).toLowerCase() === toLower)) return sendJSON(res, 403, { error: 'Вы заблокировали этого пользователя' });
+        if ((recipient.blocked || []).some(b => String(b).toLowerCase() === me.username.toLowerCase())) return sendJSON(res, 403, { error: 'Пользователь заблокировал вас' });
+        if (!canContactForPrivacy(sender, recipient, 'messages')) return sendJSON(res, 403, { error: 'Этот пользователь ограничил, кто может писать ему' });
         const isOnline = recipient.lastSeen && (Date.now() - new Date(recipient.lastSeen).getTime() < 35000);
         let videoUrl = '', fileInfo = null;
         if (typeof data.video === 'string' && data.video) {
@@ -2179,13 +2265,13 @@ function handleFavoritesGet(req, res) {
         return String(x.username || '').toLowerCase() === key;
     });
     const messages = record && Array.isArray(record.messages) ? record.messages : [];
-    sendJSON(res, 200, { messages: messages.slice(-DM_HISTORY_LIMIT) });
+    sendJSON(res, 200, { messages: messages.slice(-DM_HISTORY_LIMIT), pinnedMessageId: record && record.pinnedMessageId || null });
 }
 async function handleFavoritesCreate(req, res) {
     try {
         const me = authUser(req);
         if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
-        const data = await readBody(req);
+        const data = await readBody(req, MAX_BODY_SIZE);
         const text = String(data.text || '').trim();
         const image = processImageInput(typeof data.image === 'string' ? data.image : '', true);
         if (image === null) return sendJSON(res, 400, { error: 'Фото: разрешены PNG, JPG, WEBP или GIF до 5 МБ' });
@@ -2217,6 +2303,31 @@ async function handleFavoritesCreate(req, res) {
         sendJSON(res, 201, { message: message });
     } catch (e) { sendFail(res, e); }
 }
+async function handleFavoritesPin(req, res) {
+    try {
+        const me = authUser(req);
+        if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+        const data = await readBody(req);
+        const messageId = String(data.messageId || '').trim();
+        const pinned = data.pinned !== false;
+        if (!messageId) return sendJSON(res, 400, { error: 'Не указано сообщение' });
+        const all = readFavorites();
+        const key = String(me.username || '').toLowerCase();
+        let record = all.find(function (x) { return String(x.username || '').toLowerCase() === key; });
+        if (!record || !Array.isArray(record.messages)) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
+        const message = record.messages.find(function (m) { return String(m.id || '') === messageId; });
+        if (!message) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
+        if (pinned) {
+            record.pinnedMessageId = messageId;
+            record.messages.forEach(function (m) { m.pinned = String(m.id || '') === messageId; });
+        } else {
+            if (String(record.pinnedMessageId || '') === messageId) record.pinnedMessageId = null;
+            message.pinned = false;
+        }
+        saveFavorites(all);
+        sendJSON(res, 200, { ok: true, pinnedMessageId: record.pinnedMessageId || null });
+    } catch (e) { sendFail(res, e); }
+}
 async function handleFavoritesDelete(req, res) {
     try {
         const me = authUser(req);
@@ -2231,6 +2342,7 @@ async function handleFavoritesDelete(req, res) {
         const index = record.messages.findIndex(function (m) { return String(m.id || '') === messageId; });
         if (index < 0) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
         record.messages.splice(index, 1);
+        if (String(record.pinnedMessageId || '') === messageId) record.pinnedMessageId = null;
         saveFavorites(all);
         sendJSON(res, 200, { ok: true });
     } catch (e) { sendFail(res, e); }
@@ -2455,6 +2567,7 @@ const server = http.createServer(function (req, res) {
 
     if (url === '/api/favorites' && req.method === 'GET') return handleFavoritesGet(req, res);
     if (url === '/api/favorites' && req.method === 'POST') return handleFavoritesCreate(req, res);
+    if (url === '/api/favorites/pin' && req.method === 'POST') return handleFavoritesPin(req, res);
     if (url === '/api/favorites/delete' && req.method === 'POST') return handleFavoritesDelete(req, res);
 
     if (url === '/api/communication' && req.method === 'GET') return handleCommunication(req, res, query);
