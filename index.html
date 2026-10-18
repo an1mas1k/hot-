@@ -1285,8 +1285,7 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
                 <div class="nav-item active" id="nav-home" data-page="feed"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M4 11.500 12 5l8 6.500V19a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1z"/></svg></span><span class="nav-label">Главная</span></div>
                 <div class="nav-item" id="nav-people" data-page="people"><span class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.200"/><path d="M3 19c.5-3.200 3-5 6-5s5.500 1.800 6 5M16 5.200a3 3 0 0 1 0 5.600M18 14.300c1.800.7 2.800 2.300 3 4.700"/></svg></span><span class="nav-label">Люди</span></div>
                 <div class="nav-item" id="nav-friends" data-page="friends"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.400-7-10a4 4 0 0 1 7-2.500A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></span><span class="nav-label">Друзья</span><span class="nav-badge hidden" id="nav-friends-badge">0</span></div>
-                <div class="nav-item" id="nav-messages" data-page="messages"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.600 7.100L4 20l1-3.800A8 8 0 1 1 20 12z"/></svg></span><span class="nav-label">Сообщения</span><span class="nav-badge hidden" id="nav-messages-badge">0</span></div>
-                <div class="nav-item" id="nav-communities" data-page="communities"><span class="nav-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.500" height="6.500" rx="1.600"/><rect x="13.500" y="4" width="6.500" height="6.500" rx="1.600"/><rect x="4" y="13.500" width="6.500" height="6.500" rx="1.600"/><rect x="13.500" y="13.500" width="6.500" height="6.500" rx="1.600"/></svg></span><span class="nav-label">Сообщества</span></div>
+                <div class="nav-item" id="nav-messages" data-page="messages"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.600 7.100L4 20l1-3.800A8 8 0 1 1 20 12z"/></svg></span><span class="nav-label">Чат</span><span class="nav-badge hidden" id="nav-messages-badge">0</span></div>
                 <div class="nav-item" id="nav-wall" data-page="wall"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg></span><span class="nav-label">Страница</span></div>
                 <div class="nav-item" id="nav-settings" data-page="settings"><span class="nav-icon"><svg viewBox="0 0 24 24"><path d="M5 7h9M18 7h1M5 17h1M10 17h9"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><span class="nav-label">Настройки</span></div>
                 <div class="nav-item hidden" id="nav-admin"><span class="nav-icon admin-crown-icon"><svg class="hot-ui-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5L3 8Z"/></g></svg></span><span class="nav-label">Админ меню</span></div>
@@ -1309,9 +1308,6 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
                     <div class="chatlist-search">
                         <input type="search" id="global-search-input" placeholder="Найти или начать беседу">
                     </div>
-                </div>
-                <div class="chatlist-tabs">
-                    <button type="button" class="chatlist-tab active" data-tab="dm">Личные</button>
                 </div>
                 <div class="chatlist-body" id="chatlist-body"></div>
             </aside>
@@ -1345,8 +1341,7 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
         <button type="button" class="mobile-bottom-item active" id="mobile-bottom-home" data-nav="nav-home"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M4 11.500 12 5l8 6.500V19a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1z"/></svg></span><span>Главная</span></button>
         <button type="button" class="mobile-bottom-item" id="mobile-bottom-people" data-nav="nav-people"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.200"/><path d="M3 19c.5-3.200 3-5 6-5s5.500 1.800 6 5M16 5.200a3 3 0 0 1 0 5.600M18 14.300c1.800.7 2.800 2.300 3 4.700"/></svg></span><span>Люди</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-people-badge">0</span></button>
         <button type="button" class="mobile-bottom-item" id="mobile-bottom-friends" data-nav="nav-friends"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.400-7-10a4 4 0 0 1 7-2.500A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></span><span>Друзья</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-friends-badge">0</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-messages" data-nav="nav-messages"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.600 7.100L4 20l1-3.800A8 8 0 1 1 20 12z"/></svg></span><span>Сообщения</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-messages-badge">0</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-communities" data-nav="nav-communities"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.500" height="6.500" rx="1.600"/><rect x="13.500" y="4" width="6.500" height="6.500" rx="1.600"/><rect x="4" y="13.500" width="6.500" height="6.500" rx="1.600"/><rect x="13.500" y="13.500" width="6.500" height="6.500" rx="1.600"/></svg></span><span>Сообщества</span></button>
+        <button type="button" class="mobile-bottom-item" id="mobile-bottom-messages" data-nav="nav-messages"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.600 7.100L4 20l1-3.800A8 8 0 1 1 20 12z"/></svg></span><span>Чат</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-messages-badge">0</span></button>
         <button type="button" class="mobile-bottom-item" id="mobile-bottom-profile" data-nav="nav-wall"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg></span><span>Страница</span></button>
         <button type="button" class="mobile-bottom-item" id="mobile-bottom-settings" data-nav="nav-settings"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M5 7h9M18 7h1M5 17h1M10 17h9"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><span>Настройки</span></button>
     </nav>
@@ -1598,6 +1593,7 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
         var dmPollTimer = null;
         var favoritesPollTimer = null;
         var favoritesLastMessageId = null;
+        var favoritesPinnedMessageId = null;
         var dmLastMessageId = null;
         var dmBlocked = false;
         var dmBlockedByMe = false;
@@ -2239,7 +2235,6 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
             html += '<button class="post-action' + (liked ? ' liked' : '') + '" data-action="like" data-id="' + escapeHtml(p.id) + '">' + hotIcon('heart',17) + ' <span>' + likes.length + '</span></button>';
             html += '<button class="post-action" data-action="comment" data-id="' + escapeHtml(p.id) + '">'+hotIcon('chat',17)+' <span>' + comments.length + '</span></button>';
             html += '<button class="post-action' + (reposted ? ' reposted' : '') + '" data-action="repost" data-id="' + escapeHtml(repostId) + '">'+hotIcon('chat',17)+' <span>' + (reposted ? 'Репостнуто' : 'Репост') + '</span></button>';
-            if (isMine) html += '<button class="post-action danger" data-action="delete" data-id="' + escapeHtml(p.id) + '"><svg class="hot-ui-icon" width="17" height="17" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M9 7V4h6v3M7 7l1 14h8l1-14M10 11v6M14 11v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> ' + t('deleteAction') + '</button>';
             html += '</div>';
             html += '<div class="post-comments" data-comments-for="' + escapeHtml(p.id) + '"></div>';
             html += '</div>';
@@ -2408,12 +2403,15 @@ function renderPeople(q) {
                         btn.addEventListener('click', function (e) {
                             e.stopPropagation();
                             btn.disabled = true;
+                            btn.textContent = 'Отправляем…';
                             apiPost('/api/friends/action', { target: btn.getAttribute('data-target'), action: 'send' }).then(function (result) {
                                 var targetName = btn.getAttribute('data-target');
                                 var uu = users.find(function (x) { return String(x.username).toLowerCase() === String(targetName).toLowerCase(); });
                                 if (uu) {
+                                    // The server returns the new state; optimistically treat a successful send as sent
+                                    // as well, so the button never stays on «Добавить в друзья» after success.
                                     uu.isFriend = result.status === 'friends';
-                                    uu.requestSent = result.status === 'sent';
+                                    uu.requestSent = result.status === 'sent' || (!result.status && true);
                                     uu.requestReceived = result.status === 'received';
                                 }
                                 var searchInput = document.getElementById('people-search-input');
@@ -2558,7 +2556,9 @@ var psi = document.getElementById('people-search-input');
                             var action = 'send';
                             if (fr.status === 'friends') action = 'remove';
                             else if (fr.status === 'sent') action = 'cancel';
-                            apiPost('/api/friends/action', { target: user.username, action: action }).then(function () { openWall(user.username); updateBadges(); });
+                            frBtn.disabled = true;
+                            if (action === 'send') frBtn.textContent = 'Отправляем…';
+                            apiPost('/api/friends/action', { target: user.username, action: action }).then(function () { openWall(user.username); updateBadges(); }).catch(function (err) { frBtn.disabled = false; frBtn.textContent = action === 'send' ? t('addFriend') : (action === 'cancel' ? t('reqSent') : t('removeFriend')); alert(err.message || 'Ошибка'); });
                         });
                         var accBtn = document.getElementById('wall-accept-btn');
                         if (accBtn) accBtn.addEventListener('click', function () {
@@ -2586,10 +2586,11 @@ var psi = document.getElementById('people-search-input');
         function openCommunities(tab) {
             if (!currentUser) return;
             communitiesTab = tab || 'channels';
-            setActiveNav('nav-communities');
+            setActiveNav('nav-messages');
+            document.body.classList.add('m-list');
             clearChatElements();
             dmPartner = null;
-            chatlistEl.classList.add('hidden');
+            chatlistEl.classList.remove('hidden');
             infoPanel.classList.remove('visible');
             contentEl.style.display = 'flex';
             renderCommunitiesPage();
@@ -2597,7 +2598,7 @@ var psi = document.getElementById('people-search-input');
 
         function renderCommunitiesPage() {
             var html = '<div class="communities-page">';
-            html += '<div class="communities-head"><div class="communities-title"><h1>Сообщества</h1><p>Каналы и групповые чаты</p></div>';
+            html += '<div class="communities-head"><div class="communities-title"><h1>' + (communitiesTab === 'channels' ? 'Каналы' : 'Групповые чаты') + '</h1><p>Раздел сообщений</p></div>';
             html += '<div class="communities-create"><button type="button" class="communities-create-main" id="communities-create-btn">＋ Создать</button>';
             html += '<div class="communities-create-menu hidden" id="communities-create-menu">'
                 + '<button type="button" id="communities-create-channel"><span style="width:20px;text-align:center;"><svg class="hot-ui-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5h-7L6 20v-3H6.5A2.5 2.5 0 0 1 4 14.5Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 9h8M8 12h5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span><b>Канал</b><small>Публикации для подписчиков</small></span></button>'
@@ -2695,15 +2696,15 @@ var psi = document.getElementById('people-search-input');
             clearReplyTarget();
             clearChatElements();
             if (communityInfoIsBlocked({username: username})) {
-                chatlistEl.classList.add('hidden');
+                chatlistEl.classList.remove('hidden');
                 infoPanel.classList.remove('visible');
                 document.body.classList.add('m-chat');
                 contentInner.innerHTML = '<div class="community-blocked-page"><div class="community-blocked-icon">'+hotIcon('block',30)+'</div><div class="community-blocked-title">Канал заблокирован</div><div class="community-blocked-text">Ты заблокировал этот канал. Разблокируй его в списке сообществ, чтобы снова открыть.</div><button type="button" class="community-blocked-back" id="community-blocked-back">Вернуться к каналам</button></div>';
                 var blockedBack=document.getElementById('community-blocked-back');
-                if(blockedBack) blockedBack.onclick=function(){document.body.classList.remove('m-chat');openCommunities('channels');};
+                if(blockedBack) blockedBack.onclick=function(){document.body.classList.remove('m-chat');chatlistEl.classList.remove('hidden');contentEl.style.display='flex';infoPanel.classList.remove('visible');loadChatList();};
                 return;
             }
-            chatlistEl.classList.add('hidden');
+            chatlistEl.classList.remove('hidden');
             infoPanel.classList.remove('visible');
             document.body.classList.add('m-chat');
             contentInner.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-3);">Загрузка...</div>';
@@ -2786,9 +2787,9 @@ var psi = document.getElementById('people-search-input');
                     if(sb){ sb.onclick=function(e){ e.preventDefault(); e.stopPropagation(); openCommunitySettings('channel',c); return false; }; }
                 }
 
-                document.getElementById('back-communities').addEventListener('click',function(){
-                    document.body.classList.remove('m-chat');
-                    openCommunities('channels');
+                document.getElementById('back-communities').addEventListener('click',function(e){
+                    if(e){e.preventDefault();e.stopPropagation();}
+                    openMessages();
                 });
 
                 document.getElementById('channel-subscribe-btn').addEventListener('click',function(){
@@ -2869,7 +2870,7 @@ var psi = document.getElementById('people-search-input');
         function openGroupChat(chatId) {
             clearReplyTarget();
             clearChatElements();
-            chatlistEl.classList.add('hidden');
+            chatlistEl.classList.remove('hidden');
             infoPanel.classList.remove('visible');
             document.body.classList.add('m-chat');
             contentInner.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-3);">Загрузка...</div>';
@@ -2935,9 +2936,9 @@ var psi = document.getElementById('people-search-input');
                     if(gb){ gb.onclick=function(e){ e.preventDefault(); e.stopPropagation(); openCommunitySettings('chat',chat); return false; }; }
                 }
 
-                document.getElementById('back-communities-chat').addEventListener('click',function(){
-                    document.body.classList.remove('m-chat');
-                    openCommunities('chats');
+                document.getElementById('back-communities-chat').addEventListener('click',function(e){
+                    if(e){e.preventDefault();e.stopPropagation();}
+                    openMessages();
                 });
 
                 var pendingGroupMedia=null;
@@ -3004,50 +3005,43 @@ var psi = document.getElementById('people-search-input');
             });
         }
 
+        var messageListTab = 'dm';
         function openMessages(tab) {
+            if (tab && ['dm','channels','chats'].indexOf(tab) !== -1) messageListTab = tab;
             currentTab = 'dm';
             setActiveNav('nav-messages');
             clearChatElements();
             document.body.classList.add('m-list');
+            document.body.classList.remove('m-chat');
             dmPartner = null;
             contentEl.style.display = 'flex';
             chatlistEl.classList.remove('hidden');
             infoPanel.classList.remove('visible');
             contentInner.innerHTML = '<div class="empty-state"><div class="empty-state-icon"><svg class="hot-ui-icon" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H8l-4 4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></div><div class="empty-state-title">' + t('selectChat') + '</div><div class="empty-state-text">' + t('selectChatDesc') + '</div></div>';
-            document.querySelectorAll('.chatlist-tab').forEach(function (el) {
-                el.classList.toggle('active', el.getAttribute('data-tab') === 'dm');
-            });
             loadChatList();
         }
         function loadChatList() {
             chatlistBody.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-3);">Загрузка...</div>';
-            Promise.all([apiGet('/api/dm/conversations'), apiGet('/api/favorites'), apiGet('/api/hot-ai/messages')]).then(function (results) {
+            Promise.all([
+                apiGet('/api/dm/conversations'), apiGet('/api/favorites'),
+                apiGet('/api/channels/search?q='), apiGet('/api/chats')
+            ]).then(function (results) {
                 var dms = results[0].conversations || [];
                 var favoriteMessages = results[1].messages || [];
+                var channels = (results[2].channels || []).filter(function(c){ return c.isSubscribed || c.isOwner; });
+                var chats = results[3].chats || [];
+                var all = [];
                 var lastFavorite = favoriteMessages.length ? favoriteMessages[favoriteMessages.length - 1] : null;
-                var aiMessages = results[2].messages || [];
-                var lastAI = aiMessages.length ? aiMessages[aiMessages.length - 1] : null;
-                var all = [{
-                    type: 'favorites', id: '__favorites__', name: 'Избранное', avatar: '', handle: '',
-                    lastText: lastFavorite ? lastFavorite.text : 'Личные заметки и сохранённые сообщения',
-                    lastAt: lastFavorite ? lastFavorite.createdAt : '', lastFrom: lastFavorite ? lastFavorite.from : '',
-                    unread: 0, data: null
-                }, {
-                    type: 'hot-ai', id: '__hot_ai__', name: 'HOT AI', avatar: '', handle: '',
-                    lastText: lastAI ? lastAI.text : 'Твой ИИ-помощник',
-                    lastAt: lastAI ? lastAI.createdAt : '', lastFrom: lastAI && lastAI.role === 'user' ? currentUser.username : '',
-                    unread: 0, data: null
-                }];
-                dms.forEach(function (c) {
-                    all.push({ type:'dm', id:c.username, name:c.username, avatar:c.avatar, handle:c.handle, lastText:c.lastText, lastType:c.lastType, lastCallType:c.lastCallType, lastSystem:c.lastSystem, lastAt:c.lastAt, lastFrom:c.lastFrom, unread:c.unread, data:c });
-                });
+                all.push({ type: 'favorites', id: '__favorites__', name: 'Избранное', avatar: '', handle: '', lastText: lastFavorite ? (lastFavorite.text || (lastFavorite.image ? '__HOT_IMAGE_ATTACHMENT__' : '')) : 'Личные заметки и сохранённые сообщения', lastAt: lastFavorite ? lastFavorite.createdAt : '', lastFrom: lastFavorite ? lastFavorite.from : '', unread: 0, data: null });
+                dms.forEach(function (c) { all.push({ type:'dm', id:c.username, name:c.username, avatar:c.avatar, handle:c.handle, lastText:c.lastText, lastType:c.lastType, lastCallType:c.lastCallType, lastSystem:c.lastSystem, lastAt:c.lastAt, lastFrom:c.lastFrom, unread:c.unread, data:c }); });
+                channels.forEach(function(c){ all.push({type:'channel',id:c.username,name:c.name,avatar:c.avatar||'',lastText:'Канал · @'+c.username,lastAt:c.createdAt||'',unread:0,data:c}); });
+                chats.forEach(function(c){ all.push({type:'group',id:c.id,name:c.name,avatar:c.avatar||'',lastText:c.lastText||'Групповой чат',lastAt:c.lastAt||c.createdAt||'',unread:c.unread||0,data:c}); });
                 all.sort(function (a, b) {
                     if (a.type === 'favorites') return -1;
                     if (b.type === 'favorites') return 1;
-                    if (a.type === 'hot-ai') return -1;
-                    if (b.type === 'hot-ai') return 1;
                     return new Date(b.lastAt || 0) - new Date(a.lastAt || 0);
                 });
+                // Единый список как в VK/Telegram: личные переписки, Избранное, каналы и групповые чаты вместе.
                 renderChatList(all);
             }).catch(function(){ chatlistBody.innerHTML='<div class="chatlist-empty">Не удалось загрузить сообщения</div>'; });
         }
@@ -3060,11 +3054,11 @@ var psi = document.getElementById('people-search-input');
             items.forEach(function (c) {
                 var isUnread = c.unread > 0;
                 var isFavorite = c.type === 'favorites';
-                var isHotAI = c.type === 'hot-ai';
-                var isSystem = !isFavorite && !isHotAI && isSystemName(c.name);
+                var isCommunity = c.type === 'channel' || c.type === 'group';
+                var isSystem = !isFavorite && !isCommunity && isSystemName(c.name);
                 var prefix = (c.lastFrom && currentUser && c.lastFrom.toLowerCase() === currentUser.username.toLowerCase()) ? 'Вы: ' : '';
                 html += '<div class="chat-item' + (isUnread ? ' unread' : '') + (isFavorite ? ' favorites-chat-item' : '') + '" data-chat-type="' + c.type + '" data-chat-id="' + escapeHtml(c.id) + '">';
-                html += '<div class="chat-item-avatar' + ((isSystem || isHotAI) ? ' system' : '') + '">' + (isFavorite ? hotIcon('heart',22) : (isHotAI ? '<span style="font-weight:800;font-size:12px;background:linear-gradient(135deg,#9b5cff,#f04bc8);color:#fff;border-radius:12px;padding:7px 5px;">AI</span>' : (isSystem ? hotIcon('shield',22) : avatarHTML(c)))) + '</div>';
+                html += '<div class="chat-item-avatar' + (isSystem ? ' system' : '') + '">' + (isFavorite ? hotIcon('heart',22) : (isSystem ? hotIcon('shield',22) : (isCommunity && c.avatar ? '<img src="' + escapeHtml(c.avatar) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">' : (isCommunity ? escapeHtml((c.name||'?').trim().charAt(0).toUpperCase()) : avatarHTML(c))))) + '</div>';
                 html += '<div class="chat-item-body">';
                 html += '<div class="chat-item-top"><div class="chat-item-name">' + escapeHtml(c.name) + (isSystem ? '<span class="system-badge">система</span>' : '') + '</div><div class="chat-item-time">' + (c.lastAt ? formatTime(c.lastAt) : '') + '</div></div>';
                 if (c.lastSystem) {
@@ -3072,7 +3066,14 @@ var psi = document.getElementById('people-search-input');
                 } else if (c.lastType === 'call') {
                     html += '<div class="chat-item-preview chat-call-preview">' + phoneIconSvg(15) + '<span>' + escapeHtml(c.lastText || 'Звонок') + '</span></div>';
                 } else {
-                    html += '<div class="chat-item-preview">' + escapeHtml(prefix + (c.lastText || '')) + '</div>';
+                    var previewText = prefix + (c.lastText || '');
+                    if (previewText.indexOf('__HOT_IMAGE_ATTACHMENT__') !== -1) {
+                        html += '<div class="chat-item-preview">' + (prefix ? escapeHtml(prefix) : '') + hotIcon('image',14) + ' Фото</div>';
+                    } else if (/^(?:Вы:\s*)?📷\s*Фото$/.test(previewText) || /^(?:Вы:\s*)?Фото$/.test(previewText)) {
+                        html += '<div class="chat-item-preview">' + (prefix ? escapeHtml(prefix) : '') + hotIcon('image',14) + ' Фото</div>';
+                    } else {
+                        html += '<div class="chat-item-preview">' + escapeHtml(previewText) + '</div>';
+                    }
                 }
                 html += '</div>';
                 if (isUnread) html += '<div class="chat-item-unread">' + (c.unread > 99 ? '99+' : c.unread) + '</div>';
@@ -3091,57 +3092,16 @@ var psi = document.getElementById('people-search-input');
                     el.classList.add('active');
                     if (type === 'favorites') {
                         openFavorites();
-                    } else if (type === 'hot-ai') {
-                        openHotAI();
+                    } else if (type === 'channel') {
+                        openChannel(id);
+                    } else if (type === 'group') {
+                        openGroupChat(id);
                     } else if (type === 'dm') {
                         var c = items.filter(function (x) { return x.id === id && x.type === 'dm'; })[0];
                         if (c) openDm(c.data);
                     }
                 });
             });
-        }
-
-        var hotAIPollTimer = null;
-        function openHotAI() {
-            clearReplyTarget();
-            clearChatElements();
-            if (hotAIPollTimer) { clearInterval(hotAIPollTimer); hotAIPollTimer = null; }
-            dmPartner = null;
-            currentTab = 'dm';
-            setActiveNav('nav-messages');
-            document.body.classList.add('m-chat');
-            document.body.classList.remove('m-list');
-            contentEl.style.display = 'flex';
-            chatlistEl.classList.remove('hidden');
-            infoPanel.classList.remove('visible');
-            contentInner.innerHTML = '<div class="chat-body" id="hot-ai-messages" style="padding:22px;overflow:auto;display:flex;flex-direction:column;gap:12px;"><div style="text-align:center;color:var(--text-3);padding:30px;">Загрузка HOT AI...</div></div>';
-            var header = document.createElement('div');
-            header.className = 'chat-header';
-            header.innerHTML = '<button class="chat-back-btn" type="button" id="hot-ai-back">←</button><div class="chat-header-info"><div class="chat-header-avatar" style="background:linear-gradient(135deg,#9b5cff,#f04bc8);color:#fff;font-weight:800;">AI</div><div class="chat-header-meta"><div class="chat-header-name">HOT AI</div><div class="chat-header-status">Твой виртуальный помощник</div></div></div>';
-            contentEl.insertBefore(header, contentInner);
-            document.getElementById('hot-ai-back').onclick = function(){ openMessages(); };
-            var area = document.createElement('div');
-            area.className = 'chat-input-area';
-            area.innerHTML = '<div class="chat-input-row"><input class="chat-input" id="hot-ai-input" maxlength="6000" autocomplete="off" placeholder="Напиши сообщение HOT AI..."><button class="chat-send" id="hot-ai-send" type="button" aria-label="Отправить">' + hotIcon('send',22) + '</button></div><div class="chat-error" id="hot-ai-error"></div>';
-            contentEl.appendChild(area);
-            function render(messages) {
-                var body = document.getElementById('hot-ai-messages'); if (!body) return;
-                if (!messages.length) { body.innerHTML = '<div style="text-align:center;margin:auto;color:var(--text-3);padding:30px;"><div style="font-size:34px;margin-bottom:10px;color:#b879ff;">✦</div><div style="font-size:20px;font-weight:700;color:var(--text-1);margin-bottom:8px;">Привет! Я HOT AI</div><div>HOT AI твой виртуальный помощник</div></div>'; return; }
-                body.innerHTML = messages.map(function(m){ var mine=m.role==='user'; return '<div style="align-self:'+(mine?'flex-end':'flex-start')+';max-width:min(82%,720px);padding:12px 15px;border-radius:16px;background:'+(mine?'linear-gradient(135deg,#7b3ff2,#c03ad8)':'var(--panel-2,rgba(120,110,160,.15))')+';color:'+(mine?'#fff':'var(--text-1)')+';white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;">'+escapeHtml(m.text)+'</div>'; }).join('');
-                body.scrollTop = body.scrollHeight;
-            }
-            function load() { apiGet('/api/hot-ai/messages').then(function(r){ if(document.getElementById('hot-ai-messages')) render(r.messages||[]); }).catch(function(e){ var b=document.getElementById('hot-ai-messages'); if(b)b.textContent=e.message; }); }
-            function send() {
-                var input=document.getElementById('hot-ai-input'), btn=document.getElementById('hot-ai-send');
-                var text=(input.value||'').trim(); if(!text || btn.disabled)return;
-                btn.disabled=true; input.disabled=true;
-                var body=document.getElementById('hot-ai-messages');
-                if(body) { var waiting=document.createElement('div'); waiting.id='hot-ai-waiting'; waiting.style.cssText='align-self:flex-start;padding:12px 15px;border-radius:16px;background:var(--panel-2,rgba(120,110,160,.15));color:var(--text-3);'; waiting.textContent='HOT AI думает…'; body.appendChild(waiting); body.scrollTop=body.scrollHeight; }
-                apiPost('/api/hot-ai/send',{text:text}).then(function(r){ input.value=''; render(r.messages||[]); loadChatList(); }).catch(function(e){ var er=document.getElementById('hot-ai-error'); if(er){er.textContent=e.message;er.classList.add('visible');} var w=document.getElementById('hot-ai-waiting');if(w)w.remove(); }).then(function(){btn.disabled=false;input.disabled=false;input.focus();});
-            }
-            document.getElementById('hot-ai-send').onclick=send;
-            document.getElementById('hot-ai-input').onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}};
-            load();
         }
 
         function openFavorites() {
@@ -3222,6 +3182,7 @@ var psi = document.getElementById('people-search-input');
             apiGet('/api/favorites').then(function (data) {
                 if (document.getElementById('favorites-messages') !== body) return;
                 var messages = data.messages || [];
+                favoritesPinnedMessageId = data.pinnedMessageId || null;
                 var newLastId = messages.length ? messages[messages.length - 1].id : null;
                 if (!forceScroll && newLastId === favoritesLastMessageId) return;
                 var wasAtBottom = (body.scrollHeight - body.scrollTop - body.clientHeight) < 120;
@@ -3246,7 +3207,7 @@ var psi = document.getElementById('people-search-input');
                 var dayStr = d.toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : 'en-US');
                 if (dayStr !== lastDate) { lastDate = dayStr; html += '<div class="chat-date-sep"><span>' + escapeHtml(dayStr) + '</span></div>'; }
                 var favoriteImage = m.image ? '<img class="msg-image" src="' + escapeHtml(m.image) + '" alt="Фото из Избранного" style="max-width:100%;max-height:360px;border-radius:12px;display:block;margin-top:6px;">' : '';
-                html += '<div class="msg own" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '"><div class="msg-content"><div class="msg-bubble" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '">' + escapeHtml(m.text || '').replace(/\n/g, '<br>') + favoriteImage + '</div><div class="msg-meta">' + formatTime(m.createdAt) + '</div></div></div>';
+                html += '<div class="msg own" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '"><div class="msg-content">' + (String(m.id || '') === String(favoritesPinnedMessageId || '') ? '<div class="pinned-message-label" style="font-size:12px;color:var(--accent,#9b5cff);margin:0 4px 5px;text-align:right;">' + hotIcon('pin',13) + ' Закреплено</div>' : '') + '<div class="msg-bubble" data-msg-id="' + escapeHtml(m.id || '') + '" data-msg-from="' + escapeHtml(m.from || (currentUser && currentUser.username) || '') + '" data-msg-text="' + escapeHtml(m.text || '') + '">' + escapeHtml(m.text || '').replace(/\n/g, '<br>') + favoriteImage + '</div><div class="msg-meta">' + formatTime(m.createdAt) + '</div></div></div>';
             });
             body.innerHTML = html;
             body.querySelectorAll('.msg-bubble').forEach(function (bubble) {
@@ -3257,7 +3218,13 @@ var psi = document.getElementById('people-search-input');
                     bubble.classList.add('message-highlight');
                 });
                 var msgData = { id: bubble.getAttribute('data-msg-id'), text: bubble.getAttribute('data-msg-text') || '', from: bubble.getAttribute('data-msg-from') || '', source: 'favorites' };
-                var items = [{ action: 'delete', icon: hotIcon('trash',18), label: 'Удалить', danger: true, handler: function () {
+                var isPinnedFavorite = String(msgData.id || '') === String(favoritesPinnedMessageId || '');
+                var items = [{ action: 'pin', icon: hotIcon('pin',18), label: isPinnedFavorite ? 'Открепить' : 'Закрепить', handler: function () {
+                    apiPost('/api/favorites/pin', { messageId: msgData.id, pinned: !isPinnedFavorite }).then(function () {
+                        favoritesLastMessageId = null;
+                        loadFavoritesMessages(false);
+                    }).catch(function (e) { alert((e && e.message) || 'Не удалось закрепить сообщение'); });
+                } }, { action: 'delete', icon: hotIcon('trash',18), label: 'Удалить', danger: true, handler: function () {
                     confirmDelete('Удалить это сообщение из Избранного?', function () {
                         apiPost('/api/favorites/delete', { messageId: msgData.id }).then(function () {
                             favoritesLastMessageId = null;
@@ -3337,10 +3304,10 @@ var psi = document.getElementById('people-search-input');
                 var statusEl = document.getElementById('chat-header-status');
                 var avatarEl = document.getElementById('chat-header-avatar');
                 if (!statusEl) return;
-                var txt = formatLastSeen(res.lastSeen);
+                var txt = res.hidden ? 'Статус скрыт' : formatLastSeen(res.lastSeen);
                 statusEl.textContent = txt;
-                statusEl.classList.toggle('online', isOnline(res.lastSeen));
-                if (avatarEl) avatarEl.classList.toggle('online', isOnline(res.lastSeen));
+                statusEl.classList.toggle('online', !res.hidden && isOnline(res.lastSeen));
+                if (avatarEl) avatarEl.classList.toggle('online', !res.hidden && isOnline(res.lastSeen));
             }).catch(function(){});
         }
         function startChatStatusPolling() {
@@ -3617,9 +3584,9 @@ function showEmojiPicker(anchor, cb) {
                 var statusEl = document.getElementById('info-panel-status');
                 var avEl = document.getElementById('info-panel-avatar');
                 if (!statusEl) return;
-                statusEl.textContent = formatLastSeen(res.lastSeen);
-                statusEl.classList.toggle('online', isOnline(res.lastSeen));
-                if (avEl) avEl.classList.toggle('online', isOnline(res.lastSeen));
+                statusEl.textContent = res.hidden ? 'Статус скрыт' : formatLastSeen(res.lastSeen);
+                statusEl.classList.toggle('online', !res.hidden && isOnline(res.lastSeen));
+                if (avEl) avEl.classList.toggle('online', !res.hidden && isOnline(res.lastSeen));
             }).catch(function(){});
         }
 
@@ -3817,7 +3784,7 @@ function showEmojiPicker(anchor, cb) {
             setActiveNav('nav-settings');
             clearChatElements();
             dmPartner = null;
-            chatlistEl.classList.add('hidden');
+            chatlistEl.classList.remove('hidden');
             infoPanel.classList.remove('visible');
             var u = currentUser;
             var html = '<div class="settings-page"><div class="settings-heading"><div><h1>Настройки</h1><p class="desc">Управляй профилем, приватностью и оформлением Hot в одном месте.</p></div><div class="settings-heading-mark">⚙</div></div>';
@@ -3849,15 +3816,16 @@ function showEmojiPicker(anchor, cb) {
             html += '</div></section>';
             html += '<section class="settings-panel" data-settings-panel="privacy"><div class="settings-panel-heading"><h2>Конфиденциальность</h2><p>Выбери, кому доступна информация о тебе — в стиле Telegram.</p></div><div class="settings-section">';
             var privacySettings = u.privacySettings || {};
-            function privacySelect(key, label, hint) { var value = privacySettings[key] || 'everyone'; return '<div class="privacy-setting-row"><div class="privacy-setting-copy"><strong>' + label + '</strong><small>' + hint + '</small></div><select class="input privacy-setting-select" data-privacy-setting="' + key + '"><option value="everyone"' + (value === 'everyone' ? ' selected' : '') + '>Все</option><option value="friends"' + (value === 'friends' ? ' selected' : '') + '>Мои друзья</option><option value="nobody"' + (value === 'nobody' ? ' selected' : '') + '>Никто</option></select></div>'; }
+            function privacySelect(key, label, hint) { var value = privacySettings[key] || 'everyone'; var labels = {everyone:'Все',friends:'Мои друзья',nobody:'Никто'}; return '<div class="privacy-setting-row"><div class="privacy-setting-copy"><strong>' + label + '</strong><small>' + hint + '</small></div><div class="privacy-dropdown" data-privacy-dropdown="' + key + '"><button type="button" class="privacy-dropdown-trigger" aria-expanded="false"><span class="privacy-dropdown-value">' + labels[value] + '</span><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m7 10 5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="privacy-dropdown-menu hidden"><button type="button" data-value="everyone" class="' + (value==='everyone'?'selected':'') + '"><span class="privacy-option-dot"></span><span><strong>Все</strong><small>Любой пользователь Hot</small></span>' + (value==='everyone'?'<span class="privacy-option-check">✓</span>':'') + '</button><button type="button" data-value="friends" class="' + (value==='friends'?'selected':'') + '"><span class="privacy-option-dot"></span><span><strong>Мои друзья</strong><small>Только добавленные друзья</small></span>' + (value==='friends'?'<span class="privacy-option-check">✓</span>':'') + '</button><button type="button" data-value="nobody" class="' + (value==='nobody'?'selected':'') + '"><span class="privacy-option-dot"></span><span><strong>Никто</strong><small>Скрыть от остальных</small></span>' + (value==='nobody'?'<span class="privacy-option-check">✓</span>':'') + '</button></div><select class="privacy-setting-select" data-privacy-setting="' + key + '" aria-hidden="true" tabindex="-1"><option value="everyone"' + (value === 'everyone' ? ' selected' : '') + '>Все</option><option value="friends"' + (value === 'friends' ? ' selected' : '') + '>Мои друзья</option><option value="nobody"' + (value === 'nobody' ? ' selected' : '') + '>Никто</option></select></div></div>'; }
             html += '<div class="privacy-category-title">Кто может видеть</div>';
             html += privacySelect('profilePhoto', 'Фото профиля', 'Кому показывать твой аватар');
             html += privacySelect('lastSeen', 'Последняя активность', 'Кому показывать время последнего визита');
             html += privacySelect('birthday', 'День рождения', 'Кому показывать дату рождения');
             html += '<div class="privacy-category-title">Кто может связываться со мной</div>';
+            html += privacySelect('messages', 'Сообщения', 'Кто может писать тебе в личные сообщения');
             html += privacySelect('calls', 'Звонки', 'Кто может звонить тебе в Hot');
             html += privacySelect('groups', 'Добавление в группы и чаты', 'Кто может добавлять тебя в групповые чаты');
-            html += '<div class="privacy-save-note">Настройки сохраняются вместе с профилем. Применение ограничений к звонкам, статусу и отображению данных во всех разделах приложения требует отдельной проверки прав доступа.</div>';
+            html += '<div class="privacy-save-note">Настройки сохраняются в профиле и применяются к отображению данных, личным сообщениям, звонкам и приглашениям в групповые чаты.</div>';
             html += '<div class="privacy-note"><span>i</span><div><strong>Твои блокировки</strong><p>Заблокированные пользователи не смогут нормально взаимодействовать с тобой. Здесь также можно управлять заблокированными каналами.</p></div></div>';
             html += '<div class="field-group"><label class="field-label">Заблокированные пользователи</label><div id="settings-blocked-list" style="margin-top:6px;"><div class="blocked-empty">Загрузка...</div></div></div>';
             html += '<div class="field-group"><label class="field-label">Заблокированные каналы</label><div id="settings-blocked-channels-list" style="margin-top:6px;"><div class="blocked-empty">Загрузка...</div></div></div>';
@@ -3874,6 +3842,29 @@ function showEmojiPicker(anchor, cb) {
             html += '</div></section></div></div>';
             html += '<div class="settings-global-actions"><div class="settings-global-status"><p class="error-message" id="settings-error"></p><p class="success-message" id="settings-success"></p></div><button class="register-button" id="settings-save">Сохранить изменения</button></div></div>';
             contentInner.innerHTML = html;
+            // Custom Telegram-like privacy dropdowns. The hidden native select remains the save source.
+            contentInner.querySelectorAll('.privacy-dropdown-trigger').forEach(function(trigger){
+                trigger.addEventListener('click',function(e){
+                    e.preventDefault(); e.stopPropagation();
+                    var wrap=trigger.closest('.privacy-dropdown');
+                    var wasOpen=wrap.classList.contains('open');
+                    contentInner.querySelectorAll('.privacy-dropdown.open').forEach(function(other){other.classList.remove('open');other.querySelector('.privacy-dropdown-menu').classList.add('hidden');other.querySelector('.privacy-dropdown-trigger').setAttribute('aria-expanded','false');});
+                    if(!wasOpen){wrap.classList.add('open');wrap.querySelector('.privacy-dropdown-menu').classList.remove('hidden');trigger.setAttribute('aria-expanded','true');}
+                });
+            });
+            contentInner.querySelectorAll('.privacy-dropdown-menu button[data-value]').forEach(function(option){
+                option.addEventListener('click',function(e){
+                    e.preventDefault(); e.stopPropagation();
+                    var wrap=option.closest('.privacy-dropdown'), select=wrap.querySelector('select[data-privacy-setting]');
+                    select.value=option.getAttribute('data-value');
+                    wrap.querySelector('.privacy-dropdown-value').textContent=option.querySelector('strong').textContent;
+                    wrap.querySelectorAll('.privacy-dropdown-menu button[data-value]').forEach(function(b){b.classList.remove('selected');var check=b.querySelector('.privacy-option-check');if(check)check.remove();});
+                    option.classList.add('selected');
+                    var mark=document.createElement('span');mark.className='privacy-option-check';mark.textContent='✓';option.appendChild(mark);
+                    wrap.classList.remove('open');wrap.querySelector('.privacy-dropdown-menu').classList.add('hidden');wrap.querySelector('.privacy-dropdown-trigger').setAttribute('aria-expanded','false');
+                });
+            });
+            contentInner.querySelectorAll('.settings-nav-item').forEach(function(){});
             Array.prototype.forEach.call(contentInner.querySelectorAll('[data-settings-panel]'), function (panel) {
                 panel.style.display = panel.classList.contains('active') ? 'block' : 'none';
             });
@@ -4022,6 +4013,13 @@ function showEmojiPicker(anchor, cb) {
                 if (pendingBanner !== null) payload.banner = pendingBanner;
                 var bannerWasChanged = pendingBanner !== null;
                 apiPost('/api/update-profile', payload).then(function (res) {
+                    // Проверяем, что сервер действительно сохранил все значения конфиденциальности.
+                    // Старый server.js может принять запрос, но проигнорировать privacySettings.
+                    var savedPrivacy = res && res.user && res.user.privacySettings;
+                    var privacyKeys = ['profilePhoto', 'lastSeen', 'birthday', 'calls', 'groups', 'messages'];
+                    if (!savedPrivacy || privacyKeys.some(function (key) { return savedPrivacy[key] !== privacyPayload[key]; })) {
+                        throw new Error('Сервер не сохранил настройки конфиденциальности. Замени server.js файлом из этого архива и перезапусти сервер / Railway.');
+                    }
                     // Не показываем ложный успех, если на сервере остался старый server.js.
                     if (bannerWasChanged) {
                         if (!res.user || !Object.prototype.hasOwnProperty.call(res.user, 'banner')) {
@@ -5426,7 +5424,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
         document.getElementById('nav-people').addEventListener('click', openPeople);
         document.getElementById('nav-friends').addEventListener('click', openFriends);
         document.getElementById('nav-messages').addEventListener('click', function () { openMessages(); });
-        document.getElementById('nav-communities').addEventListener('click', function () { openCommunities('channels'); });
         document.getElementById('nav-wall').addEventListener('click', function () { openWall(currentUser.username); });
         document.getElementById('nav-settings').addEventListener('click', openSettings);
         document.getElementById('nav-admin').addEventListener('click', openAdmin);
@@ -5439,9 +5436,10 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
 
         document.querySelectorAll('.chatlist-tab').forEach(function (el) {
             el.addEventListener('click', function () {
-                currentTab = el.getAttribute('data-tab');
+                var tab = el.getAttribute('data-tab');
                 document.querySelectorAll('.chatlist-tab').forEach(function (x) { x.classList.toggle('active', x === el); });
-                loadChatList();
+                messageListTab = tab || 'dm';
+                openMessages(messageListTab);
             });
         });
 
@@ -5449,7 +5447,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
         document.getElementById('mobile-bottom-people').addEventListener('click', openPeople);
         document.getElementById('mobile-bottom-friends').addEventListener('click', openFriends);
         document.getElementById('mobile-bottom-messages').addEventListener('click', function () { openMessages(); });
-        document.getElementById('mobile-bottom-communities').addEventListener('click', function () { openCommunities('channels'); });
         document.getElementById('mobile-bottom-profile').addEventListener('click', function () { openWall(currentUser.username); });
         document.getElementById('mobile-bottom-settings').addEventListener('click', openSettings);
         document.getElementById('mobile-bottom-create').addEventListener('click', function (e) { e.stopPropagation(); mobileCreateSheet.classList.toggle('hidden'); });
@@ -6805,6 +6802,56 @@ start();
 @media(prefers-reduced-motion:reduce){.settings-panel{animation:none!important}.settings-nav-item{transition:none!important}}
 </style>
 
+
+<style id="hot-privacy-dropdown-polish">
+/* Fit the privacy section label without clipping */
+.settings-nav-item[data-settings-tab="privacy"]{min-width:0;gap:9px;padding-left:10px;padding-right:10px}
+.settings-nav-item[data-settings-tab="privacy"]>span:nth-child(2){flex:1;min-width:0}
+.settings-nav-item[data-settings-tab="privacy"] strong{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.2;font-size:12px}
+.settings-nav-item[data-settings-tab="privacy"] small{display:block;white-space:normal;line-height:1.25;margin-top:3px}
+.settings-nav-item[data-settings-tab="privacy"] .settings-nav-arrow{flex:0 0 auto}
+.privacy-setting-row{align-items:center!important}
+.privacy-dropdown{position:relative;width:176px;max-width:48%;flex:0 0 auto}
+.privacy-dropdown-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:44px;padding:0 13px;border:1px solid rgba(171,135,255,.34);border-radius:13px;background:linear-gradient(145deg,rgba(28,23,48,.98),rgba(18,16,32,.98));color:var(--text-1);font:500 13px Inter,Arial,sans-serif;text-align:left;box-shadow:0 4px 16px rgba(0,0,0,.12);transition:border-color .18s,box-shadow .18s,background .18s}
+.privacy-dropdown-trigger:hover,.privacy-dropdown.open .privacy-dropdown-trigger{border-color:#a879ff;box-shadow:0 0 0 3px rgba(142,53,255,.13)}
+.privacy-dropdown-trigger svg{color:#bca0ff;transition:transform .18s;flex-shrink:0}
+.privacy-dropdown.open .privacy-dropdown-trigger svg{transform:rotate(180deg)}
+.privacy-dropdown-menu{position:absolute;z-index:1000;top:calc(100% + 8px);right:0;width:245px;padding:6px;border:1px solid rgba(171,135,255,.28);border-radius:15px;background:rgba(19,17,32,.98);box-shadow:0 18px 44px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.025);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);animation:privacyMenuIn .14s ease-out}
+.privacy-dropdown-menu.hidden{display:none!important}
+.privacy-dropdown-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:10px;border:0;border-radius:10px;background:transparent;color:var(--text-1);text-align:left}
+.privacy-dropdown-menu button:hover{background:rgba(142,53,255,.13)}
+.privacy-dropdown-menu button.selected{background:linear-gradient(100deg,rgba(142,53,255,.2),rgba(255,36,168,.08))}
+.privacy-dropdown-menu button>span:nth-child(2){display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+.privacy-dropdown-menu button strong{font-size:12px;font-weight:650}
+.privacy-dropdown-menu button small{font-size:10px;line-height:1.35;color:var(--text-3)}
+.privacy-option-dot{width:17px;height:17px;border:1.5px solid #77718e;border-radius:50%;flex:0 0 17px}
+.privacy-dropdown-menu button.selected .privacy-option-dot{border:5px solid #a879ff}
+.privacy-option-check{color:#c4a5ff;font-weight:800;font-size:14px}
+.privacy-dropdown .privacy-setting-select{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;overflow:hidden!important;clip-path:inset(50%)!important;min-width:0!important;padding:0!important;border:0!important}
+@keyframes privacyMenuIn{from{opacity:0;transform:translateY(-4px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:520px){.privacy-setting-row{flex-direction:row!important;align-items:center!important;gap:10px!important}.privacy-dropdown{width:145px;max-width:48%}.privacy-dropdown-menu{width:min(245px,calc(100vw - 48px))}.settings-nav-item[data-settings-tab="privacy"] strong{font-size:11px}}
+</style>
+
+
+<style id="hot-privacy-nav-stable-width-fix">
+/* Keep the Privacy navigation item exactly the same size when selected. */
+.settings-nav-item[data-settings-tab="privacy"]{
+  box-sizing:border-box!important; width:100%!important; min-width:0!important;
+  flex-shrink:0!important;
+}
+.settings-nav-item[data-settings-tab="privacy"]>span:nth-child(2){
+  flex:1 1 0!important; min-width:0!important; width:0!important;
+}
+.settings-nav-item[data-settings-tab="privacy"] strong{
+  display:block!important; white-space:nowrap!important; word-break:keep-all!important;
+  overflow-wrap:normal!important; font-size:12px!important; letter-spacing:-.025em!important;
+  line-height:1.3!important; transform:none!important;
+}
+.settings-nav-item[data-settings-tab="privacy"] .settings-nav-arrow{
+  flex:0 0 auto!important; margin-left:auto!important;
+}
+</style>
+
 </body>
         </html>
 <style id="hot-no-emoji-and-member-menu-fix">
@@ -6915,3 +6962,13 @@ input:focus,textarea:focus,select:focus,.input:focus{border-color:var(--accent-2
  apply();document.addEventListener('DOMContentLoaded',apply);window.addEventListener('pageshow',apply);
 })();
 </script>
+
+<style id="hot-settings-privacy-one-line-fix">
+/* Keep the Privacy label on one line when a settings subpage is open. */
+.settings-layout{grid-template-columns:290px minmax(0,1fr)!important;gap:18px!important}
+.settings-nav-item>span:nth-child(2){flex:1 1 auto!important;min-width:0!important}
+.settings-nav-item strong{white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important;font-size:12px!important;letter-spacing:-.015em!important}
+.settings-nav-arrow{flex:0 0 auto!important;margin-left:auto!important}
+@media(max-width:1050px) and (min-width:761px){.settings-layout{grid-template-columns:285px minmax(0,1fr)!important}}
+@media(max-width:760px){.settings-layout{grid-template-columns:minmax(0,1fr)!important}.settings-nav-item strong{white-space:nowrap!important;font-size:14px!important;letter-spacing:0!important}}
+</style>
