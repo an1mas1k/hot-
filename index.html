@@ -649,6 +649,8 @@ body.m-chat .content-inner { overflow:hidden; padding:0; }
 .call-actions { position:relative; z-index:2; display:flex; gap:22px; margin-top:34px; align-items:center; justify-content:center; }
 .call-btn { width:68px; height:68px; border-radius:50%; border:0; display:flex; align-items:center; justify-content:center; font-size:26px; color:#fff; cursor:pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.4); transition: background .15s, box-shadow .15s; -webkit-tap-highlight-color: transparent; }
 .call-btn.accept { background:#2ecc71; }
+ .call-btn.call-mic-accept { background:#8e35ff; }
+ .call-overlay:not([data-mode="incoming"]) #call-accept, .call-overlay:not([data-mode="incoming"]) #call-accept-mic { display:none !important; }
 .call-btn.hang { background:#ff3b5c; }
 .call-btn.hang svg { transform: rotate(135deg); }
 .call-btn.tool { background: rgba(255,255,255,0.14); }
@@ -4192,11 +4194,13 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 + '<button type="button" class="call-btn tool" id="call-deaf" title="Отключить звук">' + callIcon('head', 22) + '</button>'
                 + '<button type="button" class="call-btn tool" id="call-cam" title="Камера">' + callIcon('cam', 22) + '</button>'
                 + (canShare ? '<button type="button" class="call-btn tool" id="call-screen" title="Показать экран">' + callIcon('screen', 22) + '</button>' : '')
-                + '<button type="button" class="call-btn accept" id="call-accept" title="Принять">' + phoneIconSvg(26) + '</button>'
+                + '<button type="button" class="call-btn accept" id="call-accept" title="Войти и слушать без микрофона" aria-label="Войти и слушать без микрофона">🎧</button>'
+                + '<button type="button" class="call-btn accept call-mic-accept" id="call-accept-mic" title="Ответить с микрофоном" aria-label="Ответить с микрофоном">' + phoneIconSvg(26) + '</button>'
                 + '<button type="button" class="call-btn hang" id="call-hang" title="Завершить">' + phoneIconSvg(26) + '</button></div>'
                 + '<audio id="call-audio" autoplay playsinline></audio>';
             document.body.appendChild(wrap);
-            cEl('call-accept').addEventListener('click', acceptCall);
+            cEl('call-accept').addEventListener('click', function () { acceptCall(false); });
+            cEl('call-accept-mic').addEventListener('click', function () { acceptCall(true); });
             cEl('call-hang').addEventListener('click', hangupCall);
             cEl('call-mute').addEventListener('click', function () {
                 if (!callState) return;
@@ -4222,6 +4226,7 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
             cEl('call-avatar').innerHTML = avatarHTML(callState.user || { username: callState.peer });
             cEl('call-status').textContent = text || '';
             cEl('call-accept').style.display = (mode === 'incoming') ? 'flex' : 'none';
+            cEl('call-accept-mic').style.display = (mode === 'incoming') ? 'flex' : 'none';
             updateCallVideoUI();
         }
         function callStatus(text) { if (cEl('call-status')) cEl('call-status').textContent = text; }
@@ -4393,10 +4398,16 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 remote: { cam: false, scr: false, mic: false, deaf: false }, remoteDc: false, dc: null
             }, extra);
         }
-        function createPeer(stream) {
+        function createPeer(stream, listenOnly) {
             var pc = new RTCPeerConnection(CALL_ICE);
-            stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
-            try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (e) {}
+            if (stream) stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
+            // Слушатель не запрашивает микрофон: принимает входящий звук, но ничего не отправляет.
+            if (listenOnly) {
+                try { pc.addTransceiver('audio', { direction: 'recvonly' }); } catch (e) {}
+                try { pc.addTransceiver('video', { direction: 'recvonly' }); } catch (e) {}
+            } else {
+                try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (e) {}
+            }
             if (callState.dir === 'out') {
                 try { bindStateChannel(pc.createDataChannel('hot-state')); } catch (e) {}
             } else {
@@ -4444,7 +4455,7 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 var mm = Math.floor(sec / 60), ss = sec % 60;
                 callStatus((mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss);
             }, 1000);
-            st.stopLocalWatch = watchSpeaking(st.stream, function (on) { if (callState === st) setSpeaking('local', on); });
+            if (st.stream) st.stopLocalWatch = watchSpeaking(st.stream, function (on) { if (callState === st) setSpeaking('local', on); });
             sendCallState();
             if (st.autoCam) { st.autoCam = false; toggleCam(); }
         }
@@ -4513,18 +4524,20 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 if (callState) finishCall({ status: 'Не удалось позвонить' });
             });
         }
-        function acceptCall() {
+        function acceptCall(withMic) {
             if (!callState || callState.dir !== 'in' || callState.pc) return;
             var st = callState;
             ensureAudioCtx();
-            getMic().then(function (stream) {
-                if (callState !== st) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+            var prepare = withMic ? getMic() : Promise.resolve(null);
+            prepare.then(function (stream) {
+                if (callState !== st) { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); return; }
                 st.stream = stream;
-                var pc = createPeer(stream);
+                st.listenOnly = !stream;
+                var pc = createPeer(stream, !stream);
                 st.pc = pc;
                 if (st.ringTimer) { clearTimeout(st.ringTimer); st.ringTimer = null; }
                 if (navigator.vibrate) navigator.vibrate(0);
-                setCallUI('active', 'Соединение…');
+                setCallUI('active', stream ? 'Соединение…' : 'Режим слушателя · микрофон не используется');
                 return pc.setRemoteDescription({ type: 'offer', sdp: st.offerSdp }).then(function () {
                     flushCandidates();
                     return pc.createAnswer();
@@ -4534,7 +4547,7 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                     });
                 });
             }).catch(function () {
-                if (callState === st) { sendCallSignal(st.peer, 'decline'); finishCall({ status: 'Не удалось ответить' }); }
+                if (callState === st) { sendCallSignal(st.peer, 'decline'); finishCall({ status: withMic ? 'Не удалось ответить с микрофоном' : 'Не удалось подключиться к звонку' }); }
             });
         }
         function hangupCall() {
