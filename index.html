@@ -659,8 +659,6 @@ body.m-chat .content-inner { overflow:hidden; padding:0; }
 .call-overlay:not([data-mode="active"]) .call-btn.tool { display:none; }
 .call-overlay[data-mode="active"] .call-actions { gap:12px; }
 .call-overlay[data-mode="active"] .call-btn { width:54px; height:54px; }
-.call-remote-video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; display:none; }
-.call-remote-video.screen { object-fit:contain; }
 .call-overlay.has-video .call-remote-video { display:block; }
 .call-overlay.has-video .call-avatar-wrap { display:none; }
 .call-overlay.has-video .call-box { position:absolute; top: calc(env(safe-area-inset-top,0px) + 14px); left:14px; width:auto; max-width:60%; align-items:flex-start; text-align:left; gap:2px; background:rgba(0,0,0,0.45); padding:8px 14px; border-radius:14px; border:2px solid transparent; transition:border-color .15s; }
@@ -668,9 +666,6 @@ body.m-chat .content-inner { overflow:hidden; padding:0; }
 .call-overlay.has-video .call-name { font-size:17px; }
 .call-overlay.has-video .call-status { font-size:13px; min-height:0; color:#fff; opacity:.8; }
 .call-overlay.has-video .call-actions { position:absolute; bottom: calc(env(safe-area-inset-bottom,0px) + 22px); left:0; right:0; margin:0; }
-.call-local-video { position:absolute; z-index:3; right:14px; top: calc(env(safe-area-inset-top,0px) + 14px); width:104px; height:146px; object-fit:cover; border-radius:14px; border:2px solid rgba(255,255,255,0.25); background:#000; transform: scaleX(-1); box-shadow:0 6px 20px rgba(0,0,0,0.5); transition:border-color .15s; }
-.call-local-video.screen { transform:none; object-fit:contain; width:150px; height:96px; }
-.call-local-video.speaking { border-color:#2ecc71; }
 .consent-row { display:flex; gap:10px; align-items:flex-start; font-size:13px; line-height:1.4; color: var(--text-3); margin:2px 0 12px; cursor:pointer; text-align:left; }
 .consent-row input { width:17px; height:17px; margin-top:1px; flex:none; accent-color:#ff2aa0; cursor:pointer; }
 .consent-row.shake { animation: consentShake 0.35s; }
@@ -3285,7 +3280,7 @@ var psi = document.getElementById('people-search-input');
             var nameHtml = escapeHtml(user.name || displayUserName(user.username)) + (isSystem ? ' <span class="system-badge" style="font-size:10px;padding:1px 6px;border-radius:6px;background:var(--accent-grad);color:#fff;font-weight:700;vertical-align:middle;">система</span>' : '');
             var statusHtml = isSystem ? 'Официальные уведомления Hot' : '...';
             var statusClass = isSystem ? 'chat-header-status system' : 'chat-header-status';
-            header.innerHTML = '<div class="chat-header-info"><div class="chat-header-avatar' + (isSystem ? ' system' : '') + '" id="chat-header-avatar">' + (isSystem ? hotIcon('shield',22) : avatarHTML(user)) + '</div><div class="chat-header-meta"><div class="chat-header-name' + (isSystem || isChannel ? '' : ' clickable') + '">' + nameHtml + '</div><div class="' + statusClass + '" id="chat-header-status">' + statusHtml + '</div></div></div><div class="chat-header-actions">' + ((isChannel || isSystem) ? '' : '<button class="chat-header-btn" id="dm-call-btn" title="Позвонить">' + phoneIconSvg(20) + '</button>' + '<button class="chat-header-btn" id="dm-video-btn" title="Видеозвонок">' + callIcon('cam', 20) + '</button>') + '</div>';
+            header.innerHTML = '<div class="chat-header-info"><div class="chat-header-avatar' + (isSystem ? ' system' : '') + '" id="chat-header-avatar">' + (isSystem ? hotIcon('shield',22) : avatarHTML(user)) + '</div><div class="chat-header-meta"><div class="chat-header-name' + (isSystem || isChannel ? '' : ' clickable') + '">' + nameHtml + '</div><div class="' + statusClass + '" id="chat-header-status">' + statusHtml + '</div></div></div><div class="chat-header-actions">' + ((isChannel || isSystem) ? '' : '<button class="chat-header-btn" id="dm-call-btn" title="Позвонить">' + phoneIconSvg(20) + '</button>') + '</div>';
             contentEl.insertBefore(header, contentInner);
             var backBtn = document.createElement('button');
             backBtn.type = 'button'; backBtn.className = 'chat-back-btn'; backBtn.textContent = '←';
@@ -3295,8 +3290,6 @@ var psi = document.getElementById('people-search-input');
             if (nameBtn) nameBtn.addEventListener('click', function () { openWall(user.username); });
             var callBtn = document.getElementById('dm-call-btn');
             if (callBtn) callBtn.addEventListener('click', function () { startCall(false); });
-            var videoBtn = document.getElementById('dm-video-btn');
-            if (videoBtn) videoBtn.addEventListener('click', function () { startCall(true); });
             if (!isSystem) updateChatHeaderStatus();
         }
         function updateChatHeaderStatus() {
@@ -4192,8 +4185,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 + '<div class="call-actions" id="call-actions">'
                 + '<button type="button" class="call-btn tool" id="call-mute" title="Микрофон">' + callIcon('mic', 22) + '</button>'
                 + '<button type="button" class="call-btn tool" id="call-deaf" title="Отключить звук">' + callIcon('head', 22) + '</button>'
-                + '<button type="button" class="call-btn tool" id="call-cam" title="Камера">' + callIcon('cam', 22) + '</button>'
-                + (canShare ? '<button type="button" class="call-btn tool" id="call-screen" title="Показать экран">' + callIcon('screen', 22) + '</button>' : '')
                 + '<button type="button" class="call-btn accept" id="call-accept" title="Войти и слушать без микрофона" aria-label="Войти и слушать без микрофона">🎧</button>'
                 + '<button type="button" class="call-btn accept call-mic-accept" id="call-accept-mic" title="Ответить с микрофоном" aria-label="Ответить с микрофоном">' + phoneIconSvg(26) + '</button>'
                 + '<button type="button" class="call-btn hang" id="call-hang" title="Завершить">' + phoneIconSvg(26) + '</button></div>'
@@ -4214,8 +4205,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 else { callState.deafened = false; callState.muted = !!callState.mutedBeforeDeaf; }
                 applyAudioState();
             });
-            cEl('call-cam').addEventListener('click', toggleCam);
-            if (cEl('call-screen')) cEl('call-screen').addEventListener('click', toggleScreen);
         }
         function setCallUI(mode, text) {
             buildCallUI();
@@ -4227,34 +4216,36 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
             cEl('call-status').textContent = text || '';
             cEl('call-accept').style.display = (mode === 'incoming') ? 'flex' : 'none';
             cEl('call-accept-mic').style.display = (mode === 'incoming') ? 'flex' : 'none';
+            var micBtn = cEl('call-mute');
+            if (micBtn) {
+                micBtn.style.display = callState.listenOnly ? 'none' : 'flex';
+                micBtn.title = callState.listenOnly ? 'Режим слушателя — микрофон не используется' : 'Микрофон';
+            }
             updateCallVideoUI();
         }
         function callStatus(text) { if (cEl('call-status')) cEl('call-status').textContent = text; }
 
-        // Обновляет кнопки и видео по текущему состоянию звонка
+        // Обновляет кнопки аудиозвонка.
         function updateCallVideoUI() {
-            var o = cEl('call-overlay');
-            if (!o || !callState) return;
-            var r = callState.remote;
-            var remoteOn = !!(callState.remoteVideoTrack && (r.cam || r.scr));
-            o.classList.toggle('has-video', remoteOn);
-            cEl('call-remote-video').classList.toggle('screen', !!r.scr);
-            var localOn = !!(callState.cam || callState.scr);
-            var lv = cEl('call-local-video');
-            lv.classList.toggle('hidden', !localOn);
-            lv.classList.toggle('screen', !!callState.scr);
+            if (!callState) return;
             var micOff = callState.muted || callState.deafened;
-            cEl('call-mute').classList.toggle('active', micOff);
-            cEl('call-mute').innerHTML = callIcon('mic', 22, micOff);
-            cEl('call-deaf').classList.toggle('active', !!callState.deafened);
-            cEl('call-deaf').innerHTML = callIcon('head', 22, !!callState.deafened);
-            cEl('call-cam').classList.toggle('active', !!callState.cam);
-            cEl('call-cam').innerHTML = callIcon('cam', 22, !callState.cam);
-            if (cEl('call-screen')) cEl('call-screen').classList.toggle('active', !!callState.scr);
+            var muteBtn = cEl('call-mute');
+            var deafBtn = cEl('call-deaf');
+            if (muteBtn) {
+                muteBtn.classList.toggle('active', micOff);
+                muteBtn.innerHTML = callIcon('mic', 22, micOff);
+            }
+            if (deafBtn) {
+                deafBtn.classList.toggle('active', !!callState.deafened);
+                deafBtn.innerHTML = callIcon('head', 22, !!callState.deafened);
+            }
             var badge = cEl('call-remote-badge');
-            var bi = r.deaf ? callIcon('head', 16, true) : (r.mic ? callIcon('mic', 16, true) : '');
-            badge.innerHTML = bi;
-            badge.classList.toggle('hidden', !bi);
+            if (badge) {
+                var r = callState.remote || {};
+                var bi = r.deaf ? callIcon('head', 16, true) : (r.mic ? callIcon('mic', 16, true) : '');
+                badge.innerHTML = bi;
+                badge.classList.toggle('hidden', !bi);
+            }
         }
         function setSpeaking(who, on) {
             if (who === 'remote') {
@@ -4262,9 +4253,8 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 if (a) a.classList.toggle('speaking', on);
                 if (c) c.classList.toggle('speaking', on);
             } else {
-                var m = cEl('call-mute'), l = cEl('call-local-video');
+                var m = cEl('call-mute');
                 if (m) m.classList.toggle('speaking', on);
-                if (l) l.classList.toggle('speaking', on);
             }
         }
 
@@ -4323,7 +4313,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
         function setLocalVideo(track, kind) {
             var st = callState;
             if (!st) return;
-            stopLocalVideoTrack(st);
             st.localVideoTrack = track;
             st.cam = (kind === 'cam');
             st.scr = (kind === 'scr');
@@ -4339,7 +4328,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
         function stopLocalVideo() {
             var st = callState;
             if (!st) return;
-            stopLocalVideoTrack(st);
             st.cam = false;
             st.scr = false;
             var snd = getVideoSender(st.pc);
@@ -4394,19 +4382,15 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
         function newCallState(extra) {
             return Object.assign({
                 pending: [], connected: false, muted: false, deafened: false, mutedBeforeDeaf: false,
-                cam: false, scr: false, localVideoTrack: null, remoteVideoTrack: null,
                 remote: { cam: false, scr: false, mic: false, deaf: false }, remoteDc: false, dc: null
             }, extra);
         }
         function createPeer(stream, listenOnly) {
             var pc = new RTCPeerConnection(CALL_ICE);
             if (stream) stream.getTracks().forEach(function (t) { pc.addTrack(t, stream); });
-            // Слушатель не запрашивает микрофон: принимает входящий звук, но ничего не отправляет.
+            // Только аудио: видеодорожки и видеотрансиверы не создаются.
             if (listenOnly) {
                 try { pc.addTransceiver('audio', { direction: 'recvonly' }); } catch (e) {}
-                try { pc.addTransceiver('video', { direction: 'recvonly' }); } catch (e) {}
-            } else {
-                try { pc.addTransceiver('video', { direction: 'sendrecv' }); } catch (e) {}
             }
             if (callState.dir === 'out') {
                 try { bindStateChannel(pc.createDataChannel('hot-state')); } catch (e) {}
@@ -4420,13 +4404,8 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 var st = callState;
                 if (!st || st.pc !== pc) return;
                 if (e.track.kind === 'video') {
-                    st.remoteVideoTrack = e.track;
-                    var rv = cEl('call-remote-video');
-                    if (rv) { rv.srcObject = new MediaStream([e.track]); var pv = rv.play(); if (pv && pv.catch) pv.catch(function () {}); }
-                    // запасной вариант, если канал данных не открылся: ориентируемся на поток кадров
-                    e.track.onunmute = function () { if (callState === st && !st.remoteDc) { st.remote.cam = true; updateCallVideoUI(); } };
-                    e.track.onmute = function () { if (callState === st && !st.remoteDc) { st.remote.cam = false; updateCallVideoUI(); } };
-                    updateCallVideoUI();
+                    try { e.track.stop(); } catch (err) {}
+                    return;
                 } else {
                     var s = (e.streams && e.streams[0]) ? e.streams[0] : new MediaStream([e.track]);
                     var au = cEl('call-audio');
@@ -4457,7 +4436,6 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
             }, 1000);
             if (st.stream) st.stopLocalWatch = watchSpeaking(st.stream, function (on) { if (callState === st) setSpeaking('local', on); });
             sendCallState();
-            if (st.autoCam) { st.autoCam = false; toggleCam(); }
         }
         function flushCandidates() {
             if (!callState || !callState.pc) return;
@@ -4475,13 +4453,10 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
             if (st.tick) clearInterval(st.tick);
             if (st.stopLocalWatch) st.stopLocalWatch();
             if (st.stopRemoteWatch) st.stopRemoteWatch();
-            stopLocalVideoTrack(st);
             try { if (st.stream) st.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
             try { if (st.dc) st.dc.close(); } catch (e) {}
             try { if (st.pc) st.pc.close(); } catch (e) {}
             var au = cEl('call-audio'); if (au) { au.srcObject = null; au.muted = false; }
-            var rv = cEl('call-remote-video'); if (rv) rv.srcObject = null;
-            var lv = cEl('call-local-video'); if (lv) { lv.srcObject = null; lv.classList.add('hidden'); }
             if (navigator.vibrate) navigator.vibrate(0);
             if (opts.log && st.dir === 'out') logCall(st.peer, opts.log, st.startedAt ? Math.round((Date.now() - st.startedAt) / 1000) : 0);
             var o = cEl('call-overlay');
@@ -4497,16 +4472,23 @@ if (lr && le) { var lg = localStorage.getItem('hot_lang') || 'ru'; lr.classList.
                 setTimeout(function () { if (!callState) o.classList.add('hidden'); }, 1400);
             } else if (o) { o.classList.add('hidden'); }
         }
-        function startCall(withVideo) {
+        function startCall() {
             if (!dmPartner || dmBlocked || dmPartner.isChannel) return;
             if (isSystemName(dmPartner.username)) return;
             if (callState) return;
             var peer = dmPartner.username;
             ensureAudioCtx();
-            getMic().then(function (stream) {
-                callState = newCallState({ peer: peer, user: dmPartner, dir: 'out', stream: stream, autoCam: withVideo === true });
-                setCallUI('calling', 'Вызов…');
-                var pc = createPeer(stream);
+            // Пользователь может начать исходящий звонок в режиме слушателя.
+            // Отмена в этом вопросе означает: звонить без доступа к микрофону.
+            var withMic = window.confirm('Включить микрофон для звонка?\\n\\nОК — звонить с микрофоном.\\nОтмена — подключиться в режиме «Только слушать».');
+            var prepare = withMic ? getMic() : Promise.resolve(null);
+            prepare.then(function (stream) {
+                callState = newCallState({
+                    peer: peer, user: dmPartner, dir: 'out', stream: stream,
+                    listenOnly: !stream
+                });
+                setCallUI('calling', stream ? 'Вызов…' : 'Вызов · режим слушателя, микрофон не используется');
+                var pc = createPeer(stream, !stream);
                 callState.pc = pc;
                 return pc.createOffer().then(function (offer) {
                     return pc.setLocalDescription(offer).then(function () {
