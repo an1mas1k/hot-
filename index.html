@@ -2325,7 +2325,7 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
                   if(st.premium&&st.premiumUntil){statusNode.textContent='HOT Premium активен до '+new Date(st.premiumUntil).toLocaleDateString('ru-RU');statusNode.style.color='#9ee7b4';}
                   else {statusNode.textContent='Premium пока не активен';statusNode.style.color='';}
                 }
-                contentInner.querySelectorAll('[data-premium-plan]').forEach(function(btn){var plan=btn.getAttribute('data-premium-plan');var bought=!!st.premium;btn.disabled=bought;btn.textContent=bought?'Куплено':(plan==='month'?'Купить за 1 000 🔥':'Купить за 10 000 🔥');if(bought){btn.setAttribute('aria-label','Куплено — HOT Premium активен');btn.classList.add('premium-purchased');}else{btn.removeAttribute('aria-label');btn.classList.remove('premium-purchased');}});
+                contentInner.querySelectorAll('[data-premium-plan]').forEach(function(btn){var plan=btn.getAttribute('data-premium-plan');var bought=!!st.premium&&st.premiumPlan===plan;var premiumActive=!!st.premium;btn.disabled=premiumActive;btn.textContent=bought?'Куплено':(premiumActive?'Недоступно до окончания Premium':(plan==='month'?'Купить за 1 000 🔥':'Купить за 10 000 🔥'));if(bought){btn.setAttribute('aria-label','Куплено — этот тариф HOT Premium активен');btn.classList.add('premium-purchased');}else{btn.removeAttribute('aria-label');btn.classList.remove('premium-purchased');}});
               }).catch(function(e){if(balanceNode)balanceNode.textContent='Не удалось загрузить баланс';if(statusNode)statusNode.textContent=e.message;});
             }
             contentInner.querySelectorAll('[data-premium-plan]').forEach(function(btn){
