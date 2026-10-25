@@ -1281,6 +1281,42 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
 @media(max-width:800px){.premium-page{padding:20px 14px 90px}.premium-hero{padding:26px 22px}.premium-flame{font-size:72px;right:5%;top:12%;opacity:.35}.premium-features{grid-template-columns:1fr}.premium-plans{grid-template-columns:1fr}.premium-hero p{max-width:100%;font-size:14px}}
 </style>
 
+
+<style id="hot-mobile-four-tab-redesign">
+@media (max-width:900px) {
+  :root { --hot-mobile-nav-bg: rgba(8, 7, 25, .96); }
+  .mobile-app-header { height:68px!important; padding:0 22px!important; background:linear-gradient(180deg,rgba(5,7,15,.98),rgba(5,7,15,.90))!important; border:0!important; }
+  .mobile-brand { gap:9px!important; font-size:25px!important; }
+  .mobile-brand-fire { display:flex; width:35px; height:42px; align-items:center; justify-content:center; }
+  .mobile-brand-fire svg { width:35px;height:40px; }
+  .mobile-brand-fire svg path:first-child { fill:#d927ff!important; }
+  .mobile-brand-fire svg path:last-child { fill:#ff24a8!important; }
+  .mobile-brand-text { background:linear-gradient(100deg,#fff 5%,#d6b8ff 50%,#ff24c8 100%)!important; -webkit-background-clip:text!important;background-clip:text!important; }
+  .mobile-icon-btn { width:44px!important;height:44px!important;border-radius:50%!important;border:1px solid rgba(142,53,255,.55)!important;background:rgba(45,12,93,.35)!important;color:#e64bff!important;font-size:23px!important; }
+  #mobile-bottom-create { display:none!important; }
+  .mobile-search-strip { display:flex!important; align-items:center; gap:13px; width:calc(100% - 36px); min-height:58px; margin:8px 18px 16px; padding:0 20px; border:1.5px solid #8e35ff; border-radius:30px; background:rgba(11,11,42,.82); color:#9298c9; font:500 18px Inter,Arial,sans-serif; text-align:left; cursor:pointer; }
+  .mobile-search-strip svg { width:25px;height:25px;fill:none;stroke:#b5a9ff;stroke-width:2.3;stroke-linecap:round; }
+  .mobile-bottom-nav { left:12px!important;right:12px!important;bottom:calc(8px + env(safe-area-inset-bottom, 0px))!important;width:auto!important;height:92px!important;min-height:92px!important;padding:8px 9px!important;gap:4px!important;justify-content:space-around!important;align-items:stretch!important;background:linear-gradient(145deg,rgba(10,9,38,.98),rgba(8,6,25,.98))!important;border:1.5px solid #7020ff!important;border-radius:29px!important;box-shadow:0 0 24px rgba(110,22,255,.13),inset 0 1px 0 rgba(255,255,255,.035)!important;backdrop-filter:blur(22px)!important; }
+  .mobile-bottom-item { display:flex!important; flex:1 1 0!important; width:auto!important; min-width:0!important;height:100%!important;margin:0!important;padding:5px 2px!important;gap:5px!important;border:0!important;border-radius:22px!important;background:transparent!important;color:#a6a9df!important;font-size:12px!important;font-weight:500!important;line-height:1.15!important;white-space:nowrap; }
+  .mobile-bottom-icon { display:flex!important;align-items:center;justify-content:center;width:100%;height:43px;font-size:29px!important;line-height:1!important; }
+  .mobile-bottom-icon svg { width:31px;height:31px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+  .mobile-bottom-item.active { color:#f1a4ff!important;background:rgba(100,12,226,.30)!important;box-shadow:0 0 20px rgba(134,25,255,.17)!important; }
+  .mobile-bottom-item.active .mobile-bottom-icon { color:#db37ff!important;filter:drop-shadow(0 0 7px rgba(205,30,255,.38)); }
+  .mobile-bottom-premium { color:#f0a5ff!important;font-weight:600!important; }
+  .mobile-bottom-premium .mobile-bottom-icon { color:#bd35ff; }
+  .mobile-bottom-premium .mobile-bottom-icon svg { fill:currentColor;stroke:currentColor; }
+  #mobile-bottom-settings { display:flex!important; }
+  .hot-mobile-legacy-hidden { display:none!important; }
+  .mobile-bottom-badge { right:5px!important;top:2px!important; }
+  .app { padding-bottom:125px!important; }
+  .content { min-height:calc(100dvh - 205px)!important; }
+  .content-inner { padding:14px!important; }
+  .mobile-search-panel { top:132px!important; }
+  .mobile-create-sheet { bottom:calc(112px + env(safe-area-inset-bottom, 0px))!important; }
+}
+@media (min-width:901px) { .mobile-search-strip { display:none!important; } }
+</style>
+
 </head>
 <body>
 
@@ -1377,6 +1413,10 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
         </div>
     </div>
 
+    <button type="button" class="mobile-search-strip" id="mobile-search-strip" aria-label="Открыть поиск">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg><span>Поиск</span>
+    </button>
+
     <div class="mobile-search-panel hidden" id="mobile-search-panel">
         <div class="mobile-search-row">
             <input type="search" class="mobile-search-input" id="mobile-search-input" placeholder="Поиск людей и каналов..." autocomplete="off">
@@ -1385,13 +1425,23 @@ html { scrollbar-color: rgba(142, 53, 255, .72) rgba(16, 12, 27, .45); scrollbar
         <div class="mobile-search-results" id="mobile-search-results"></div>
     </div>
 
-    <nav class="mobile-bottom-nav hidden" id="mobile-bottom-nav">
-        <button type="button" class="mobile-bottom-item active" id="mobile-bottom-home" data-nav="nav-home"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M4 11.500 12 5l8 6.500V19a1 1 0 0 1-1 1h-4v-5H9v5H5a1 1 0 0 1-1-1z"/></svg></span><span>Главная</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-people" data-nav="nav-people"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.200"/><path d="M3 19c.5-3.200 3-5 6-5s5.500 1.800 6 5M16 5.200a3 3 0 0 1 0 5.600M18 14.300c1.800.7 2.800 2.300 3 4.700"/></svg></span><span>Люди</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-people-badge">0</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-friends" data-nav="nav-friends"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.400-7-10a4 4 0 0 1 7-2.500A4 4 0 0 1 19 10c0 5.600-7 10-7 10z"/></svg></span><span>Друзья</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-friends-badge">0</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-messages" data-nav="nav-messages"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-11.600 7.100L4 20l1-3.800A8 8 0 1 1 20 12z"/></svg></span><span>Чат</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-messages-badge">0</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-profile" data-nav="nav-wall"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7zM14 3v4h4"/></svg></span><span>Страница</span></button>
-        <button type="button" class="mobile-bottom-item" id="mobile-bottom-settings" data-nav="nav-settings"><span class="mobile-bottom-icon"><svg viewBox="0 0 24 24"><path d="M5 7h9M18 7h1M5 17h1M10 17h9"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></span><span>Настройки</span></button>
+    <nav class="mobile-bottom-nav hidden" id="mobile-bottom-nav" aria-label="Основная навигация">
+        <button type="button" class="mobile-bottom-item" id="mobile-bottom-messages" data-nav="nav-messages" aria-label="Чат">
+            <span class="mobile-bottom-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 11.5a8.2 8.2 0 0 1-8.4 8.2 9 9 0 0 1-3.7-.8L3 20l1.2-4.1a8 8 0 1 1 16.3-4.4Z" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="1.1"/><circle cx="8.5" cy="11.5" r="1" fill="#090714"/><circle cx="12" cy="11.5" r="1" fill="#090714"/><circle cx="15.5" cy="11.5" r="1" fill="#090714"/></svg></span>
+            <span>Чат</span><span class="mobile-bottom-badge hidden" id="mobile-bottom-messages-badge">0</span>
+        </button>
+        <button type="button" class="mobile-bottom-item" id="mobile-bottom-profile" data-nav="nav-wall" aria-label="Профиль">
+            <span class="mobile-bottom-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="7.5" r="4"/><path d="M4 21v-2.2a6.2 6.2 0 0 1 6.2-6.2h3.6a6.2 6.2 0 0 1 6.2 6.2V21Z"/></svg></span><span>Профиль</span>
+        </button>
+        <button type="button" class="mobile-bottom-item mobile-bottom-premium" id="mobile-bottom-premium" data-nav="nav-premium" aria-label="HOT Premium">
+            <span class="mobile-bottom-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 4.8 4L12 3l4.2 7L21 6l-2.2 13H5.2Z"/><path d="M7 22h10"/></svg></span><span>HOT Premium</span>
+        </button>
+        <button type="button" class="mobile-bottom-item hot-mobile-legacy-hidden" id="mobile-bottom-home" data-nav="nav-home" aria-hidden="true" tabindex="-1"></button>
+        <button type="button" class="mobile-bottom-item hot-mobile-legacy-hidden" id="mobile-bottom-people" data-nav="nav-people" aria-hidden="true" tabindex="-1"></button>
+        <button type="button" class="mobile-bottom-item hot-mobile-legacy-hidden" id="mobile-bottom-friends" data-nav="nav-friends" aria-hidden="true" tabindex="-1"></button>
+        <button type="button" class="mobile-bottom-item" id="mobile-bottom-settings" data-nav="nav-settings" aria-label="Настройки">
+            <span class="mobile-bottom-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 0 0 0-7.6Z"/><path d="m19.4 13.5 1.2 1-1.8 3.1-1.5-.5a7.8 7.8 0 0 1-2 1.2l-.3 1.6h-3.6l-.3-1.6a7.8 7.8 0 0 1-2-1.2l-1.5.5-1.8-3.1 1.2-1a7.6 7.6 0 0 1 0-2.3l-1.2-1 1.8-3.1 1.5.5a7.8 7.8 0 0 1 2-1.2l.3-1.6h3.6l.3 1.6a7.8 7.8 0 0 1 2 1.2l1.5-.5 1.8 3.1-1.2 1a7.6 7.6 0 0 1 0 2.3Z"/></svg></span><span>Настройки</span>
+        </button>
     </nav>
 
     <div class="mobile-create-sheet hidden" id="mobile-create-sheet">
@@ -7318,5 +7368,23 @@ input:focus,textarea:focus,select:focus,.input:focus{border-color:var(--accent-2
 /* Окно подтверждения выхода из канала открывается из окна информации (z-index 9998) — поднимаем его выше */
 #channel-leave-confirm-modal{z-index:10050!important}
 </style>
+
+<script id="hot-mobile-premium-tab-handler">
+(function(){
+  function bind(){
+    var premium=document.getElementById('mobile-bottom-premium');
+    var target=document.getElementById('nav-premium');
+    if(premium && target && !premium.dataset.hotBound){
+      premium.dataset.hotBound='1';
+      premium.addEventListener('click',function(){target.click();});
+    }
+    var strip=document.getElementById('mobile-search-strip');
+    var searchBtn=document.getElementById('mobile-search-btn');
+    if(strip && searchBtn && !strip.dataset.hotBound){strip.dataset.hotBound='1';strip.addEventListener('click',function(){searchBtn.click();});}
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
+})();
+</script>
+
 </body>
 </html>
