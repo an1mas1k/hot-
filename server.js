@@ -77,9 +77,15 @@ function readJSON(fp) {
     }
 }
 function writeJSON(fp, data) {
-    const tmp = fp + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tmp, fp);
+    // Уникальный временный файл исключает конфликт одинакового .tmp между процессами.
+    const tmp = fp + '.' + process.pid + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';
+    try {
+        fs.writeFileSync(tmp, JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'wx' });
+        fs.renameSync(tmp, fp);
+    } catch (e) {
+        try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (_) {}
+        throw e;
+    }
 }
 
 function readUsers() { return readJSON(USERS_FILE); }
@@ -160,8 +166,16 @@ function saveAttachment(dataUrl, kind, origName) {
     const mime = (m[1] || '').toLowerCase();
     let ext = '';
     if (kind === 'video') {
-        ext = VIDEO_EXT[mime];
-        if (!ext) return null;
+        ext = VIDEO_EXT[mime] || '';
+        if (!ext) {
+            // Определяем формат по сигнатуре, если браузер не указал MIME.
+            const raw = dataUrl.slice(dataUrl.indexOf(',') + 1);
+            const head = Buffer.from(raw.slice(0, 64), 'base64');
+            if (head.length >= 12 && head.slice(4, 8).toString('ascii') === 'ftyp') ext = 'mp4';
+            else if (head.slice(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) ext = 'webm';
+            else if (head.slice(0, 4).toString('ascii') === 'OggS') ext = 'ogv';
+            else return null;
+        }
     } else {
         const em = /\.([a-zA-Z0-9]{1,8})$/.exec(origName || '');
         ext = em ? em[1].toLowerCase() : '';
@@ -413,7 +427,7 @@ function readBody(req, maxBytes) {
         req.on('data', function (chunk) {
             if (dead) return;
             size += chunk.length;
-            if (size > limit) { dead = true; reject(badRequest('Слишком большой запрос', 413)); req.destroy(); return; }
+            if (size > limit) { dead = true; chunks.length = 0; reject(badRequest('Слишком большой запрос', 413)); req.resume(); setTimeout(function () { try { req.destroy(); } catch (e) {} }, 2000); return; }
             chunks.push(chunk);
         });
         req.on('end', function () {
@@ -482,15 +496,16 @@ function requireDev(req,res){
 function staffCan(me, action){
     const role=getStaffRole(me);
     if(role==='founder') return true;
-    if(role==='admin') return ['mute','unmute','send_channel','send_chat'].indexOf(action)!==-1;
+    if(action==='set_verified' || action==='set_role' || action==='set_channel_verified') return false;
+    if(role==='admin') return ['mute','unmute','send_channel','send_chat','grant_coins'].indexOf(action)!==-1;
     if(role==='moderator') return ['mute','unmute'].indexOf(action)!==-1;
     return false;
 }
 async function handleAdminPanel(req,res){
     const me=requireStaff(req,res); if(!me)return;
     const myRole=getStaffRole(me);
-    const users=readUsers().map(function(u){ensureDevFounder(u);return {username:u.username,email:u.email||'',avatar:u.avatar||'',adminRole:u.adminRole||null,displayName:adminDisplayName(u),muted:!!u.muted,banned:!!u.banned,lastSeen:u.lastSeen||''};});
-    const channels=readChannels().map(function(c){return {id:c.id,username:c.username,name:c.name,description:c.description||'',owner:c.owner,members:Array.isArray(c.members)?c.members.length:0,memberList:Array.isArray(c.members)?c.members.slice(0,100):[],messages:Array.isArray(c.messages)?c.messages.length:0,createdAt:c.createdAt||''};});
+    const users=readUsers().map(function(u){ensureDevFounder(u);return {username:u.username,email:u.email||'',avatar:u.avatar||'',adminRole:u.adminRole||null,verified:!!u.verified,displayName:adminDisplayName(u),muted:!!u.muted,banned:!!u.banned,hotCoins:Math.max(0,Math.floor(Number(u.hotCoins)||0)),premiumUntil:Number(u.premiumUntil)||null,lastSeen:u.lastSeen||''};});
+    const channels=readChannels().map(function(c){return {id:c.id,username:c.username,name:c.name,description:c.description||'',owner:c.owner,verified:!!c.verified,members:Array.isArray(c.members)?c.members.length:0,memberList:Array.isArray(c.members)?c.members.slice(0,100):[],messages:Array.isArray(c.messages)?c.messages.length:0,createdAt:c.createdAt||''};});
     const chats=readChats().map(function(c){return {id:c.id,name:c.name,owner:c.owner,members:Array.isArray(c.members)?c.members:[],memberCount:Array.isArray(c.members)?c.members.length:0,messages:Array.isArray(c.messages)?c.messages.length:0,createdAt:c.createdAt||''};});
     sendJSON(res,200,{role:myRole,displayName:adminDisplayName(me),users:users,channels:channels,chats:chats,permissions:{mute:myRole!=='user',write:myRole==='founder'||myRole==='admin',manage:myRole==='founder',roles:myRole==='founder'}});
 }
@@ -548,11 +563,33 @@ async function handleAdminAction(req,res){
             if(c.messages.length>300)c.messages=c.messages.slice(-300);
             saveChats(chats); return sendJSON(res,200,{ok:true});
         }
+        if(action==='set_channel_verified'){
+            if(getStaffRole(me)!=='founder') return sendJSON(res,403,{error:'Только Основатель может управлять галочками каналов'});
+            const channelKey=String(data.channel||'').trim();
+            if(!channelKey) return sendJSON(res,400,{error:'Не указан канал'});
+            const channels=readChannels();
+            const channelIndex=channels.findIndex(function(c){return String(c.username||'').toLowerCase()===channelKey.toLowerCase() || String(c.id||'')===channelKey;});
+            if(channelIndex<0) return sendJSON(res,404,{error:'Канал не найден'});
+            const channel=channels[channelIndex];
+            channel.verified=data.verified===true;
+            channel.verifiedAt=channel.verified?new Date().toISOString():null;
+            channel.verifiedBy=channel.verified?me.username:null;
+            saveChannels(channels);
+            return sendJSON(res,200,{ok:true,verified:!!channel.verified});
+        }
         if(!username)return sendJSON(res,400,{error:'Не указан пользователь'});
         const users=readUsers(); const idx=users.findIndex(function(u){return u.username.toLowerCase()===username.toLowerCase();});
         if(idx<0)return sendJSON(res,404,{error:'Пользователь не найден'});
         const u=users[idx]; ensureDevFounder(u);
-        if(isDevUser(u)) return sendJSON(res,403,{error:'Аккаунт Dev защищён'});
+        if(action==='grant_coins') {
+            if(!['founder','admin'].includes(getStaffRole(me))) return sendJSON(res,403,{error:'Выдавать жетоны может только Основатель или Администратор'});
+            const amount=Number(data.amount);
+            if(!Number.isSafeInteger(amount)||amount<1||amount>1000000) return sendJSON(res,400,{error:'Укажи количество жетонов от 1 до 1 000 000'});
+            u.hotCoins=Math.max(0,Math.floor(Number(u.hotCoins)||0))+amount;
+            saveUsers(users);
+            return sendJSON(res,200,{ok:true,hotCoins:u.hotCoins});
+        }
+        if(isDevUser(u) && action!=='set_verified') return sendJSON(res,403,{error:'Аккаунт Dev защищён'});
         if(action==='mute')u.muted=!u.muted;
         else if(action==='unmute')u.muted=false;
         else if(action==='kick')destroyUserSessions(u.username);
@@ -560,6 +597,11 @@ async function handleAdminAction(req,res){
         else if(action==='unban')u.banned=false;
         else if(action==='set_role'){
             const role=String(data.role||''); u.adminRole=(role==='admin'||role==='moderator')?role:null;
+        } else if(action==='set_verified'){
+            if(getStaffRole(me)!=='founder') return sendJSON(res,403,{error:'Только Основатель может управлять верификацией'});
+            u.verified = data.verified === true;
+            u.verifiedAt = u.verified ? new Date().toISOString() : null;
+            u.verifiedBy = u.verified ? me.username : null;
         } else if(action==='delete'){users.splice(idx,1);destroyUserSessions(username);saveUsers(users);return sendJSON(res,200,{ok:true});}
         else return sendJSON(res,400,{error:'Неизвестное действие'});
         saveUsers(users); sendJSON(res,200,{ok:true});
@@ -609,7 +651,7 @@ async function handleRegister(req, res) {
             user: {
                 username: newUser.username, email: newUser.email, avatar: '', handle: '',
                 theme: 'dark', wallpaper: '', birthday: '',
-                friends: [], incomingRequests: [], blocked: [], adminRole: newUser.adminRole || null, displayName: adminDisplayName(newUser)
+                friends: [], incomingRequests: [], blocked: [], verified: !!newUser.verified, adminRole: newUser.adminRole || null, displayName: adminDisplayName(newUser)
             }
         });
     } catch (e) { sendFail(res, e); }
@@ -661,7 +703,7 @@ async function handleLogin(req, res) {
                 handle: user.handle || '', theme: user.theme || 'dark',
                 wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: normalizedPrivacySettings(user),
                 friends: user.friends || [], incomingRequests: user.incomingRequests || [],
-                blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
+                blocked: user.blocked || [], verified: !!user.verified, adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user), hotCoins: Math.max(0, Math.floor(Number(user.hotCoins)||0)), premiumUntil: Number(user.premiumUntil)||null
             }
         });
     } catch (e) { sendFail(res, e); }
@@ -810,7 +852,7 @@ function handleSession(req, res) {
             handle: user.handle || '', theme: user.theme || 'dark',
             wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: normalizedPrivacySettings(user),
             friends: user.friends || [], incomingRequests: user.incomingRequests || [],
-            blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
+            blocked: user.blocked || [], verified: !!user.verified, adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
         }
     });
 }
@@ -958,7 +1000,7 @@ async function handlePasswordResetConfirm(req, res) {
             if (list.length !== all.length) saveResets(list);
             return sendJSON(res, 400, { error: BAD_CODE });
         }
-        if (!safeEqualHex(hashResetCode(code, email, rec.salt), rec.codeHash)) {
+        if (typeof rec.salt !== 'string' || !rec.salt || typeof rec.codeHash !== 'string' || !/^[a-f0-9]{128}$/i.test(rec.codeHash) || !safeEqualHex(hashResetCode(code, email, rec.salt), rec.codeHash)) {
             rec.attempts = (rec.attempts || 0) + 1;
             const next = rec.attempts >= RESET_CODE_MAX_ATTEMPTS ? list.filter(function (r) { return r !== rec; }) : list;
             saveResets(next);
@@ -1195,6 +1237,43 @@ async function handleForward(req, res) {
     } catch (e) { sendFail(res, e); }
 }
 
+/* ========== HOT PREMIUM: purchase with Hot fire tokens ========== */
+const HOT_PREMIUM_PRICES = { month: 1000, year: 10000 };
+function premiumStatusFor(user) {
+    const until = Number(user && user.premiumUntil) || 0;
+    return { hotCoins: Math.max(0, Math.floor(Number(user && user.hotCoins) || 0)), premium: until > Date.now(), premiumUntil: until || null, premiumPlan: until > Date.now() ? (user.premiumPlan || null) : null, prices: HOT_PREMIUM_PRICES };
+}
+function handlePremiumStatus(req, res) {
+    const me = authUser(req);
+    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    return sendJSON(res, 200, premiumStatusFor(me));
+}
+async function handlePremiumBuy(req, res) {
+    const me = authUser(req);
+    if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
+    try {
+        const data = await readBody(req);
+        const plan = String(data.plan || '');
+        if (!Object.prototype.hasOwnProperty.call(HOT_PREMIUM_PRICES, plan)) return sendJSON(res, 400, { error: 'Неизвестный тариф HOT Premium' });
+        const users = readUsers();
+        const user = users.find(u => String(u.username || '').toLowerCase() === String(me.username || '').toLowerCase());
+        if (!user) return sendJSON(res, 404, { error: 'Пользователь не найден' });
+        const now = Date.now();
+        if (Number(user.premiumUntil) > now) return sendJSON(res, 409, { error: 'HOT Premium уже куплен и активен до ' + new Date(Number(user.premiumUntil)).toLocaleDateString('ru-RU') + '.', ...premiumStatusFor(user) });
+        const price = HOT_PREMIUM_PRICES[plan];
+        const balance = Math.max(0, Math.floor(Number(user.hotCoins) || 0));
+        if (balance < price) return sendJSON(res, 400, { error: 'Не хватает жетонов огонька. Нужно ' + price.toLocaleString('ru-RU') + ' 🔥, у тебя ' + balance.toLocaleString('ru-RU') + ' 🔥.' });
+        const base = now;
+        const duration = plan === 'month' ? 30 * 24 * 60 * 60 * 1000 : 365 * 24 * 60 * 60 * 1000;
+        user.hotCoins = balance - price;
+        user.premiumUntil = base + duration;
+        user.premiumPlan = plan;
+        user.premiumUpdatedAt = new Date(now).toISOString();
+        saveUsers(users);
+        return sendJSON(res, 200, { ok: true, ...premiumStatusFor(user), spent: price, message: 'HOT Premium активирован!' });
+    } catch (e) { return sendFail(res, e); }
+}
+
 /* ========== PROFILE ========== */
 
 async function handleUpdateProfile(req, res) {
@@ -1344,7 +1423,7 @@ async function handleUpdateProfile(req, res) {
                 username: user.username, email: user.email, avatar: user.avatar || '', banner: user.banner || '',
                 handle: user.handle || '', theme: user.theme || 'dark',
                 wallpaper: user.wallpaper || '', birthday: user.birthday || '', privacySettings: hasPrivacySettings ? privacySettings : normalizedPrivacySettings(user),
-                friends: user.friends || [], blocked: user.blocked || [], adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
+                friends: user.friends || [], blocked: user.blocked || [], verified: !!user.verified, adminRole: ensureDevFounder(user).adminRole || null, displayName: adminDisplayName(user)
             }
         });
     } catch (e) { sendFail(res, e); }
@@ -1438,7 +1517,7 @@ function handleUsersList(req, res) {
             const uLower = String(u.username || '').toLowerCase();
             const meLower = me.username.toLowerCase();
             return {
-                username: u.username, displayName: adminDisplayName(u), avatar: canViewPrivacyField(me, u, 'profilePhoto') ? (u.avatar || '') : '', banner: u.banner || '', handle: u.handle || '', theme: u.theme || 'dark', friends: u.friends || [], lastSeen: canViewPrivacyField(me, u, 'lastSeen') ? (u.lastSeen || u.createdAt) : null, birthday: canViewPrivacyField(me, u, 'birthday') ? (u.birthday || '') : '', createdAt: u.createdAt,
+                username: u.username, displayName: adminDisplayName(u), verified: !!u.verified, premiumUntil: Number(u.premiumUntil)||null, avatar: canViewPrivacyField(me, u, 'profilePhoto') ? (u.avatar || '') : '', banner: u.banner || '', handle: u.handle || '', theme: u.theme || 'dark', friends: u.friends || [], lastSeen: canViewPrivacyField(me, u, 'lastSeen') ? (u.lastSeen || u.createdAt) : null, birthday: canViewPrivacyField(me, u, 'birthday') ? (u.birthday || '') : '', createdAt: u.createdAt,
                 isFriend: (u.friends || []).some(f => String(f).toLowerCase() === meLower) || (me.friends || []).some(f => String(f).toLowerCase() === uLower),
                 requestSent: (u.incomingRequests || []).some(r => String(r).toLowerCase() === meLower),
                 requestReceived: (me.incomingRequests || []).some(r => String(r).toLowerCase() === uLower)
@@ -1453,7 +1532,7 @@ function handleUserSearch(req, res, query) {
     const users = readUsers().filter(u => !u.system);
     const results = q ? users.filter(u => (u.handle || '').toLowerCase().includes(q) || u.username.toLowerCase().includes(q)) : users;
     const viewer = readUsers().find(x => x.username.toLowerCase() === me.username.toLowerCase()) || me;
-    sendJSON(res, 200, { users: results.slice(0, 20).map(u => ({ username: u.username, displayName: adminDisplayName(u), avatar: canViewPrivacyField(viewer, u, 'profilePhoto') ? (u.avatar || '') : '', handle: u.handle || '' })) });
+    sendJSON(res, 200, { users: results.slice(0, 20).map(u => ({ username: u.username, displayName: adminDisplayName(u), verified: !!u.verified, premiumUntil: Number(u.premiumUntil)||null, avatar: canViewPrivacyField(viewer, u, 'profilePhoto') ? (u.avatar || '') : '', handle: u.handle || '' })) });
 }
 
 /* ========== POSTS ========== */
@@ -1464,7 +1543,7 @@ function normalizePost(p, repostedByViewer, usersList, viewerUser) {
     const authorAvatar = viewerUser && !canViewPrivacyField(viewerUser, author, 'profilePhoto') ? '' : (author.avatar || p.avatar || '');
     const comments = (Array.isArray(p.comments) ? p.comments : []).map(function (comment) {
         const commentUser = allUsers.find(function (u) { return u.username.toLowerCase() === String(comment.username || '').toLowerCase(); });
-        const copy = Object.assign({}, comment);
+        const copy = Object.assign({}, comment, { verified: !!(commentUser && commentUser.verified) });
         if (viewerUser && commentUser && !canViewPrivacyField(viewerUser, commentUser, 'profilePhoto')) copy.avatar = '';
         return copy;
     });
@@ -1474,7 +1553,7 @@ function normalizePost(p, repostedByViewer, usersList, viewerUser) {
         const originalAuthor = allUsers.find(function (u) { return u.username.toLowerCase() === String(repostOf.username || '').toLowerCase(); });
         if (viewerUser && originalAuthor && !canViewPrivacyField(viewerUser, originalAuthor, 'profilePhoto')) repostOf.avatar = '';
     }
-    return { id: p.id, username: p.username, displayName: adminDisplayName(author), avatar: authorAvatar, text: p.text || '', image: p.image || '', createdAt: p.createdAt, likes: Array.isArray(p.likes) ? p.likes : [], comments: comments, repostOf: repostOf, repostCount: typeof p.repostCount === 'number' ? p.repostCount : 0, repostedByViewer: !!repostedByViewer };
+    return { id: p.id, username: p.username, displayName: adminDisplayName(author), verified: !!author.verified, avatar: authorAvatar, text: p.text || '', image: p.image || '', createdAt: p.createdAt, likes: Array.isArray(p.likes) ? p.likes : [], comments: comments, repostOf: repostOf, repostCount: typeof p.repostCount === 'number' ? p.repostCount : 0, repostedByViewer: !!repostedByViewer };
 }
 function handleFeedGet(req, res, query) {
     const me = authUser(req);
@@ -1655,7 +1734,7 @@ function isChannelAdmin(c, username) { return !!username && nameIn(c.admins, use
 function isChatAdmin(c, username) { return !!username && nameIn(c.admins, username) && nameIn(c.members, username); }
 function channelPublic(c, viewer) {
     const isSub = viewer ? (c.members || []).some(m => m.toLowerCase() === viewer.toLowerCase()) : false;
-    return { id: c.id, username: c.username, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, createdAt: c.createdAt, members: Array.isArray(c.members) ? c.members.length : 0, memberNames: Array.isArray(c.members) ? c.members : [], admins: Array.isArray(c.admins) ? c.admins.filter(a => nameIn(c.members, a)) : [], isAdmin: viewer ? isChannelAdmin(c, viewer) : false, isSubscribed: isSub, isOwner: !!(viewer && c.owner && String(c.owner).trim().toLowerCase() === String(viewer).trim().toLowerCase()), allowInvites: c.allowInvites !== false, writeMode: c.writeMode === 'members' ? 'members' : 'owner' };
+    return { id: c.id, username: c.username, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, verified: !!c.verified, createdAt: c.createdAt, members: Array.isArray(c.members) ? c.members.length : 0, memberNames: Array.isArray(c.members) ? c.members : [], admins: Array.isArray(c.admins) ? c.admins.filter(a => nameIn(c.members, a)) : [], isAdmin: viewer ? isChannelAdmin(c, viewer) : false, isSubscribed: isSub, isOwner: !!(viewer && c.owner && String(c.owner).trim().toLowerCase() === String(viewer).trim().toLowerCase()), allowInvites: c.allowInvites !== false, writeMode: c.writeMode === 'members' ? 'members' : 'owner' };
 }
 async function handleChannelCreate(req, res) {
     try {
@@ -1902,7 +1981,7 @@ async function handleChatCreate(req, res) {
     try {
         const me = authUser(req);
         if (!me) return sendJSON(res, 401, { error: 'Не авторизован' });
-        const data = await readBody(req);
+        const data = await readBody(req, MAX_BODY_SIZE);
         const name = (data.name || '').trim();
         if (!name || name.length > 80) return sendJSON(res, 400, { error: 'Название чата: 1-80 символов' });
         if (String(data.description || '').length > 500) return sendJSON(res, 400, { error: 'Описание чата до 500 символов' });
@@ -1914,7 +1993,13 @@ async function handleChatCreate(req, res) {
         if (deniedInvite) return sendJSON(res, 403, { error: 'Пользователь ' + deniedInvite + ' ограничил добавление в группы и чаты' });
         if (!members.some(x => x.toLowerCase() === me.username.toLowerCase())) members.unshift(me.username);
         members = Array.from(new Map(members.map(x => [x.toLowerCase(), x])).values()).slice(0, 100);
-        const chat = { id: makeId(), name, description: (data.description || '').trim(), avatar: processImageInput(typeof data.avatar === 'string' ? data.avatar : '', true), allowInvites: true, allowMembersWrite: true, owner: me.username, admins: [], members, messages: [], pinnedMessageId: null, createdAt: new Date().toISOString() };
+        const createdAt = new Date().toISOString();
+        const invitedMembers = members.filter(function (x) { return x.toLowerCase() !== me.username.toLowerCase(); });
+        const chat = { id: makeId(), name, description: (data.description || '').trim(), avatar: processImageInput(typeof data.avatar === 'string' ? data.avatar : '', true), allowInvites: true, allowMembersWrite: true, owner: me.username, admins: [], members, messages: [], pinnedMessageId: null, createdAt };
+        // Системное событие видно всем участникам и хранится вместе с чатом.
+        if (invitedMembers.length) {
+            chat.messages.push({ id: makeId(), from: 'HOT', text: 'Вас ' + me.username + ' добавил в чат', type: 'system', systemEvent: 'member_added', addedBy: me.username, addedMembers: invitedMembers, read: [me.username], createdAt });
+        }
         const chats = readChats();
         chats.push(chat);
         saveChats(chats);
@@ -1933,7 +2018,7 @@ function handleChatsGet(req, res, query) {
             if (!Array.isArray(m.read)) return;
             if (!m.read.some(u => u.toLowerCase() === user)) unread++;
         });
-        return { id: c.id, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, admins: Array.isArray(c.admins) ? c.admins : [], members: c.members, memberCount: c.members.length, lastText: last ? last.text : '', lastAt: last ? last.createdAt : c.createdAt, unread };
+        return { id: c.id, name: c.name, description: c.description || '', avatar: c.avatar || '', owner: c.owner, admins: Array.isArray(c.admins) ? c.admins : [], members: c.members, memberCount: c.members.length, lastText: last ? ((last.systemEvent === 'member_added' && String(last.addedBy || '').toLowerCase() === user) ? 'Вы создали чат' : last.text) : '', lastAt: last ? last.createdAt : c.createdAt, unread };
     });
     sendJSON(res, 200, { chats: list });
 }
@@ -2093,10 +2178,10 @@ async function handleChatMessageDelete(req, res) {
         if (!c) return sendJSON(res, 404, { error: 'Чат не найден' });
         const msg = (c.messages || []).find(m => m.id === messageId);
         if (!msg) return sendJSON(res, 404, { error: 'Сообщение не найдено' });
-        const isAuthor = msg.from && msg.from.toLowerCase() === me.username.toLowerCase();
-        const chatOwnerLower = String(c.owner || '').toLowerCase();
-        const canDelete = isAuthor || chatOwnerLower === me.username.toLowerCase() || (isChatAdmin(c, me.username) && String(msg.from || '').toLowerCase() !== chatOwnerLower);
-        if (!canDelete) return sendJSON(res, 403, { error: 'Нет прав на удаление этого сообщения' });
+        const isAuthor = msg.from && String(msg.from).toLowerCase() === String(me.username).toLowerCase();
+        const isOwner = String(c.owner || '').toLowerCase() === String(me.username).toLowerCase();
+        const isChatAdmin = Array.isArray(c.admins) && c.admins.some(a => String(a).toLowerCase() === String(me.username).toLowerCase());
+        if (!isAuthor && !isOwner && !isChatAdmin) return sendJSON(res, 403, { error: 'Можно удалять только свои сообщения или управлять чатом' });
         c.messages = (c.messages || []).filter(m => m.id !== messageId);
         if (c.pinnedMessageId === messageId) c.pinnedMessageId = null;
         saveChats(chats);
@@ -2501,6 +2586,8 @@ const server = http.createServer(function (req, res) {
     if (url === '/api/password-reset/confirm' && req.method === 'POST') return handlePasswordResetConfirm(req, res);
     if (url === '/api/logout' && req.method === 'POST') return handleLogout(req, res);
     if (url === '/api/auth/session' && req.method === 'GET') return handleSession(req, res);
+    if (url === '/api/premium/status' && req.method === 'GET') return handlePremiumStatus(req, res);
+    if (url === '/api/premium/buy' && req.method === 'POST') return handlePremiumBuy(req, res);
     if (url === '/api/hot-ai/messages' && req.method === 'GET') return handleHotAIMessages(req, res);
     if (url === '/api/hot-ai/send' && req.method === 'POST') return handleHotAISend(req, res);
     if ((url === '/api/admin/panel' || url === '/api/admin/users') && req.method === 'GET') return handleAdminPanel(req, res);
